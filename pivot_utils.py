@@ -7,7 +7,9 @@ Uses dask and pyarrow for efficient large-file processing.
 """
 
 import re
-from typing import Optional, Tuple, Dict, Any
+import os
+from pathlib import Path
+from typing import Optional, Tuple, Dict, Any, List
 import logging
 import dask.dataframe as dd
 import pandas as pd
@@ -15,6 +17,21 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 logger = logging.getLogger(__name__)
+
+# S3 and filesystem imports
+try:
+    import fsspec
+    HAS_FSSPEC = True
+except ImportError:
+    HAS_FSSPEC = False
+    logger.warning("fsspec not installed; S3 support will be limited")
+
+try:
+    import s3fs
+    HAS_S3FS = True
+except ImportError:
+    HAS_S3FS = False
+    logger.warning("s3fs not installed; S3 support requires fsspec")
 
 
 # ============================================================================
@@ -463,3 +480,153 @@ def read_parquet_schema(file_path: str) -> pa.Schema:
     """
     pf = pq.ParquetFile(file_path)
     return pf.schema_arrow
+
+
+# ============================================================================
+# Part 2: S3 & File Discovery Functions
+# ============================================================================
+
+
+def is_s3_path(path: str) -> bool:
+    """
+    Check if a path is an S3 URI.
+    
+    Args:
+        path: Path or URI string
+        
+    Returns:
+        True if path starts with 's3://', False otherwise
+    """
+    return path.lower().startswith('s3://')
+
+
+def get_storage_options(path: str) -> Dict[str, Any]:
+    """
+    Get storage options for fsspec based on the path.
+    
+    For S3 paths, returns anonymous=True by default to support
+    public S3 buckets. Can be customized based on credentials.
+    
+    Args:
+        path: Local or S3 path
+        
+    Returns:
+        Dictionary of storage options for fsspec
+    """
+    if is_s3_path(path):
+        # Default to anonymous access for S3; can be overridden
+        return {
+            'anon': True,  # Anonymous access
+            'requester_pays': False,
+        }
+    else:
+        # Local filesystem doesn't need special options
+        return {}
+
+
+def get_filesystem(path: str):
+    """
+    Get the appropriate fsspec filesystem for the given path.
+    
+    Args:
+        path: Local or S3 path
+        
+    Returns:
+        fsspec filesystem object (LocalFileSystem for local paths, 
+        S3FileSystem for S3 paths)
+        
+    Raises:
+        ImportError: If fsspec is not installed
+    """
+    if not HAS_FSSPEC:
+        raise ImportError(
+            "fsspec is required for file operations. Install with: pip install fsspec s3fs"
+        )
+    
+    if is_s3_path(path):
+        if not HAS_S3FS:
+            raise ImportError(
+                "s3fs is required for S3 operations. Install with: pip install s3fs"
+            )
+        storage_opts = get_storage_options(path)
+        return fsspec.filesystem('s3', **storage_opts)
+    else:
+        # Use local filesystem
+        return fsspec.filesystem('file')
+
+
+def discover_parquet_files(input_path: str) -> List[str]:
+    """
+    Discover all parquet files recursively in a directory or S3 path.
+    
+    Args:
+        input_path: Directory path (local) or S3 URI (s3://bucket/prefix)
+        
+    Returns:
+        Sorted list of absolute paths to .parquet files
+        
+    Raises:
+        ValueError: If input path does not exist
+        ImportError: If required packages are not installed
+    """
+    if not input_path:
+        raise ValueError("input_path cannot be empty")
+    
+    parquet_files = []
+    
+    if is_s3_path(input_path):
+        # S3 path discovery
+        try:
+            fs = get_filesystem(input_path)
+        except ImportError as e:
+            logger.error(f"Cannot discover S3 files: {e}")
+            raise
+        
+        try:
+            # Use glob to find all parquet files recursively
+            # S3 path format: s3://bucket/prefix
+            pattern = input_path.rstrip('/') + '/**/*.parquet'
+            files = fs.glob(pattern)
+            
+            if not files:
+                logger.warning(f"No parquet files found at {input_path}")
+                return []
+            
+            # Convert to s3:// URIs if not already
+            parquet_files = [
+                f's3://{f}' if not f.startswith('s3://') else f
+                for f in files
+            ]
+            
+        except Exception as e:
+            logger.error(f"Error discovering S3 files at {input_path}: {e}")
+            raise ValueError(f"Could not discover files at {input_path}: {e}")
+    
+    else:
+        # Local path discovery
+        path = Path(input_path)
+        
+        if not path.exists():
+            raise ValueError(f"Path does not exist: {input_path}")
+        
+        if not path.is_dir():
+            raise ValueError(f"Path is not a directory: {input_path}")
+        
+        try:
+            # Recursively find all .parquet files
+            parquet_files = [
+                str(f.resolve()) for f in path.rglob('*.parquet')
+            ]
+        except Exception as e:
+            logger.error(f"Error discovering local files at {input_path}: {e}")
+            raise ValueError(f"Could not discover files at {input_path}: {e}")
+    
+    if not parquet_files:
+        logger.warning(f"No parquet files found at {input_path}")
+        return []
+    
+    # Return sorted list
+    parquet_files = sorted(parquet_files)
+    logger.info(f"Discovered {len(parquet_files)} parquet files at {input_path}")
+    
+    return parquet_files
