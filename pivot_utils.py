@@ -3,13 +3,16 @@ pivot_utils.py
 
 Core utility functions for taxi data pivoting pipeline.
 Handles column detection, month inference, pivoting, and data cleaning.
+Uses dask and pyarrow for efficient large-file processing.
 """
 
 import re
 from typing import Optional, Tuple, Dict, Any
 import logging
+import dask.dataframe as dd
 import pandas as pd
-import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 logger = logging.getLogger(__name__)
 
@@ -136,13 +139,15 @@ def infer_month_from_path(file_path: str) -> Optional[Tuple[int, int]]:
 
 
 def pivot_counts_date_taxi_type_location(
-    df: pd.DataFrame,
+    df,
     datetime_col: Optional[str] = None,
     location_col: Optional[str] = None,
     taxi_type_col: Optional[str] = None,
-) -> pd.DataFrame:
+):
     """
     Pivot trip-level records into (date × taxi_type × pickup_place × hour) counts.
+    
+    Works with both pandas DataFrames and dask DataFrames.
     
     The resulting table will have:
     - Index: (taxi_type, date, pickup_place)
@@ -150,13 +155,13 @@ def pivot_counts_date_taxi_type_location(
     - Missing hour values are filled with 0
     
     Args:
-        df: Input dataframe with trip records
+        df: Pandas or Dask DataFrame with trip records
         datetime_col: Name of pickup datetime column (auto-detected if None)
         location_col: Name of pickup location column (auto-detected if None)
         taxi_type_col: Name of taxi type column (auto-detected if None)
         
     Returns:
-        Pivoted dataframe indexed by (taxi_type, date, pickup_place)
+        Pivoted pandas DataFrame indexed by (taxi_type, date, pickup_place)
         
     Raises:
         ValueError: If required columns cannot be found or inferred
@@ -175,12 +180,18 @@ def pivot_counts_date_taxi_type_location(
     if location_col is None:
         raise ValueError("Could not find pickup location column")
     
-    # Ensure taxi_type_col exists or use 'taxi_type' if present
+    # If taxi_type_col not provided and not in columns, will be inferred from context
     if taxi_type_col is None:
         if 'taxi_type' in columns:
             taxi_type_col = 'taxi_type'
         else:
-            raise ValueError("Could not find taxi type column")
+            # Will be set by caller function
+            taxi_type_col = 'taxi_type'
+    
+    # Convert dask to pandas if needed
+    is_dask = isinstance(df, dd.DataFrame)
+    if is_dask:
+        df = df.compute()
     
     # Make a copy to avoid modifying the original
     df = df.copy()
@@ -193,14 +204,18 @@ def pivot_counts_date_taxi_type_location(
     df['date'] = df[datetime_col].dt.date
     df['hour'] = df[datetime_col].dt.hour
     
+    # Ensure taxi_type_col exists
+    if taxi_type_col not in df.columns:
+        raise ValueError(f"Could not find taxi type column: {taxi_type_col}")
+    
     # Group and count
     counts = df.groupby(
-        ['taxi_type', 'date', location_col, 'hour']
+        [taxi_type_col, 'date', location_col, 'hour']
     ).size().reset_index(name='count')
     
     # Pivot: hours become columns
     pivoted = counts.pivot_table(
-        index=['taxi_type', 'date', location_col],
+        index=[taxi_type_col, 'date', location_col],
         columns='hour',
         values='count',
         fill_value=0,
@@ -226,20 +241,22 @@ def pivot_counts_date_taxi_type_location(
     pivoted = pivoted[hour_cols]
     
     # Rename index to standardized names
-    pivoted.index.names = ['taxi_type', 'date', 'pickup_place']
+    pivoted.index.names = [taxi_type_col, 'date', 'pickup_place']
     
     return pivoted
 
 
 def cleanup_low_count_rows(
-    df: pd.DataFrame,
+    df,
     min_rides: int = 50,
-) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+) -> Tuple:
     """
     Discard rows with fewer than min_rides (sum across hour columns).
     
+    Works with both pandas DataFrames and dask DataFrames.
+    
     Args:
-        df: Dataframe with hour_0, hour_1, ..., hour_23 columns
+        df: Pandas or Dask DataFrame with hour_0, hour_1, ..., hour_23 columns
         min_rides: Minimum rides per row to keep (default 50)
         
     Returns:
@@ -256,12 +273,19 @@ def cleanup_low_count_rows(
     
     if not hour_cols:
         logger.warning("No hour columns found in dataframe")
+        is_dask = isinstance(df, dd.DataFrame)
+        before = len(df) if not is_dask else df.compute().shape[0]
         return df, {
-            'rows_before': len(df),
-            'rows_after': len(df),
+            'rows_before': before,
+            'rows_after': before,
             'rows_removed': 0,
             'min_rides': min_rides,
         }
+    
+    # Convert dask to pandas if needed
+    is_dask = isinstance(df, dd.DataFrame)
+    if is_dask:
+        df = df.compute()
     
     # Calculate total rides per row
     df = df.copy()
@@ -291,13 +315,13 @@ def cleanup_low_count_rows(
 
 def get_common_schema(df_list: list) -> Dict[str, str]:
     """
-    Find common required columns across multiple dataframes.
+    Find common required columns across multiple dataframes or parquet files.
     
     Args:
-        df_list: List of pandas DataFrames
+        df_list: List of pandas/dask DataFrames or file paths to parquet files
         
     Returns:
-        Dict mapping column name to inferred dtype
+        Dict mapping column name to column role (datetime, location, taxi_type)
     """
     required_cols = {
         'datetime': find_pickup_datetime_col,
@@ -307,8 +331,19 @@ def get_common_schema(df_list: list) -> Dict[str, str]:
     
     common_schema = {}
     
-    for df in df_list:
-        cols = df.columns.tolist()
+    for item in df_list:
+        if isinstance(item, str):
+            # It's a file path - read parquet schema
+            try:
+                pf = pq.ParquetFile(item)
+                cols = pf.schema_arrow.names
+            except Exception as e:
+                logger.error(f"Could not read schema from {item}: {e}")
+                continue
+        else:
+            # It's a dataframe
+            cols = item.columns.tolist()
+        
         for key, detector in required_cols.items():
             col = detector(cols)
             if col and key not in common_schema:
@@ -317,24 +352,30 @@ def get_common_schema(df_list: list) -> Dict[str, str]:
     return common_schema
 
 
-def normalize_schema(df: pd.DataFrame, common_schema: Dict[str, str]) -> pd.DataFrame:
+def normalize_schema(df, common_schema: Dict[str, str]):
     """
     Normalize a dataframe to a common schema.
     
+    Works with pandas and dask DataFrames.
     Ensures required columns exist and renames them to standard names.
     
     Args:
-        df: Input dataframe
+        df: Pandas or Dask DataFrame
         common_schema: Mapping of standard names to actual column names
         
     Returns:
         Dataframe with normalized column names
     """
-    df = df.copy()
+    # Convert dask to pandas if needed for preprocessing
+    is_dask = isinstance(df, dd.DataFrame)
+    if is_dask:
+        df_work = df.compute()
+    else:
+        df_work = df.copy()
     
     # Map actual columns to standard names
     rename_map = {}
-    columns = df.columns.tolist()
+    columns = df_work.columns.tolist()
     
     if 'datetime' in common_schema:
         datetime_col = find_pickup_datetime_col(columns)
@@ -351,7 +392,10 @@ def normalize_schema(df: pd.DataFrame, common_schema: Dict[str, str]) -> pd.Data
             raise ValueError("taxi_type column not found")
     
     if rename_map:
-        df = df.rename(columns=rename_map)
+        if is_dask:
+            df = df.rename(columns=rename_map)
+        else:
+            df = df_work.rename(columns=rename_map)
     
     return df
 
@@ -361,12 +405,14 @@ def normalize_schema(df: pd.DataFrame, common_schema: Dict[str, str]) -> pd.Data
 # ============================================================================
 
 
-def get_hour_columns(df: pd.DataFrame) -> list:
+def get_hour_columns(df) -> list:
     """
     Get all hour_* columns from a dataframe, sorted by hour.
     
+    Works with pandas and dask DataFrames.
+    
     Args:
-        df: Dataframe to inspect
+        df: Pandas or Dask DataFrame to inspect
         
     Returns:
         Sorted list of hour column names
@@ -375,15 +421,45 @@ def get_hour_columns(df: pd.DataFrame) -> list:
     return sorted(hour_cols, key=lambda x: int(x.split('_')[1]))
 
 
-def get_total_rides(df: pd.DataFrame) -> pd.Series:
+def get_total_rides(df):
     """
     Calculate total rides (sum across hours) for each row.
     
+    Works with pandas and dask DataFrames.
+    
     Args:
-        df: Dataframe with hour_* columns
+        df: Pandas or Dask DataFrame with hour_* columns
         
     Returns:
         Series of total rides per row
     """
     hour_cols = get_hour_columns(df)
     return df[hour_cols].sum(axis=1)
+
+
+def read_parquet_with_dask(file_path: str, **kwargs):
+    """
+    Read a parquet file using dask.
+    
+    Args:
+        file_path: Path to parquet file (local or S3)
+        **kwargs: Additional arguments to pass to dask.dataframe.read_parquet
+        
+    Returns:
+        Dask DataFrame
+    """
+    return dd.read_parquet(file_path, **kwargs)
+
+
+def read_parquet_schema(file_path: str) -> pa.Schema:
+    """
+    Read the schema of a parquet file using pyarrow.
+    
+    Args:
+        file_path: Path to parquet file (local or S3)
+        
+    Returns:
+        PyArrow Schema object
+    """
+    pf = pq.ParquetFile(file_path)
+    return pf.schema_arrow
