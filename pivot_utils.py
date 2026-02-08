@@ -60,32 +60,69 @@ def find_pickup_datetime_col(columns: list) -> Optional[str]:
     return None
 
 
+def _normalize_col_for_match(col) -> Optional[str]:
+    """Coerce column to str for comparison; return None if empty. Handles bytes/other types from Parquet."""
+    if col is None:
+        return None
+    s = str(col).strip()
+    return s if s else None
+
+
 def find_pickup_location_col(columns: list) -> Optional[str]:
     """
     Find the pickup location column name, handling common variants.
+    Prefers zone-ID columns (e.g. PULocationID); falls back to lat/lon for older schemas.
+    Coerces column names to str so bytes or other Parquet/Dask types match correctly.
     
     Args:
-        columns: List of column names
+        columns: List of column names (str, bytes, or other; will be coerced to str for matching)
         
     Returns:
-        Column name if found, None otherwise
+        Column name if found (original from list, for use in df[col]), None otherwise
         
     Examples:
-        - 'pickup_location_id', 'pulocationid', 'pickup_zone'
+        - 'PULocationID', 'PUlocationID', 'pickup_location_id', 'pulocationid', 'pickup_zone'
+        - 'pickup_latitude' (fallback for older NYC TLC files without zone ID)
     """
-    # Try various patterns for pickup location
+    # 1) Exact match for NYC TLC column names (case-insensitive) - preserve actual casing from file
+    for col in columns:
+        col_str = _normalize_col_for_match(col)
+        if not col_str:
+            continue
+        normalized = col_str.lower().replace('_', '').replace(' ', '')
+        if normalized == 'pulocationid':
+            return col
+
+    # 2) Other known zone/location names (include 'pickup_place' = normalized name used after schema normalization)
+    known_zone = (
+        'pickup_place', 'pickup_location_id', 'pickup_zone', 'pu_zone', 'start_location_id',
+    )
+    for col in columns:
+        col_str = _normalize_col_for_match(col)
+        if col_str and col_str.lower() in known_zone:
+            return col
+
+    # 3) Regex patterns for pickup location
     patterns = [
         r'.*pickup.*location.*',
         r'.*pulocationid.*',
         r'.*pu_location.*',
+        r'.*pu\s*location.*',
     ]
-    
     for pattern_str in patterns:
         pattern = re.compile(pattern_str, re.IGNORECASE)
-        matches = [col for col in columns if pattern.match(col)]
-        if matches:
-            return matches[0]
-    
+        for col in columns:
+            col_str = _normalize_col_for_match(col)
+            if col_str and pattern.match(col_str):
+                return col
+
+    # 4) Fallback: older NYC TLC files (e.g. 2010 yellow) have pickup_latitude / pickup_longitude only
+    fallback = ('pickup_latitude', 'pickup_longitude', 'pickup_lat', 'pickup_lon')
+    for col in columns:
+        col_str = _normalize_col_for_match(col)
+        if col_str and col_str.lower() in fallback:
+            return col
+
     return None
 
 
@@ -248,7 +285,7 @@ def pivot_counts_date_taxi_type_location(
             pivoted = pivoted.rename(columns={hour: f'hour_{hour}'})
     
     # Ensure correct column naming
-    pivoted.columns = [f'hour_{i}' if isinstance(col, int) else f'hour_{int(col.split("_")[1])}' 
+    pivoted.columns = [f'hour_{col}' if isinstance(col, int) else f'hour_{int(col.split("_")[1])}' 
                       if 'hour_' in str(col) else f'hour_{col}' 
                       for col in pivoted.columns]
     
@@ -357,9 +394,14 @@ def get_common_schema(df_list: list) -> Dict[str, str]:
             except Exception as e:
                 logger.error(f"Could not read schema from {item}: {e}")
                 continue
+        elif isinstance(item, list) and item and isinstance(item[0], str):
+            # It's a list of column names
+            cols = item
         else:
             # It's a dataframe
             cols = item.columns.tolist()
+
+
         
         for key, detector in required_cols.items():
             col = detector(cols)
