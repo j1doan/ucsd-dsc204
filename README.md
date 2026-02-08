@@ -270,18 +270,18 @@ Core utility functions for column detection, pivoting, and S3 operations.
 
 ### `partition_optimization.py`
 
-Partition sizing utilities for efficient Parquet reading.
+Partition optimization utilities for efficient large-file processing. Tests different partition sizes to find an optimal balance between memory use and performance using PyArrow batching and memory profiling.
 
 **Key Functions:**
 
 | Function | Purpose |
 |----------|---------|
-| `parse_size(size_str)` | Convert "200MB", "1.5GB", etc. → bytes (int) |
-| `format_size(num_bytes)` | Convert bytes → "1.5GB", "200MB", etc. |
-| `get_process_memory_mb()` | Get current process memory (MB) |
-| `get_available_memory_mb()` | Get available system memory (MB) |
-| `find_optimal_partition_size(parquet_path, max_memory_usage=...)` | Test candidate block sizes, pick best for speed/memory |
-| `test_partition_size(parquet_path, blocksize, iterations=3)` | Measure read performance for a specific block size |
+| `parse_size(size_str)` | Parse a human-readable size string to bytes. Accepts e.g. `"200MB"`, `"1.5GB"`, `"1024KB"`, `"2TB"`. Returns size in bytes (int). Raises `ValueError` if format is invalid. |
+| `format_size(size_bytes)` | Convert bytes to human-readable format (e.g. `"1.5GB"`, `"200MB"`). |
+| `get_process_memory_mb()` | Get current process memory usage in MB (RSS). |
+| `get_available_memory_mb()` | Get available system memory in MB. |
+| `find_optimal_partition_size(file_path, candidate_sizes=None, size_range=None, num_sizes=5, max_memory_usage=None, warmup=True)` | Find optimal partition size for a parquet file using PyArrow batching. Tests different partition sizes (default 50MB–1GB if `size_range` not set), measures time and memory for each, and selects the best size within `max_memory_usage` (default 80% of available memory). Returns a dict with `optimal_size`, `optimal_size_str`, `results`, `max_memory_usage`, and `file_info`. |
+| `test_partition_size(file_path, partition_size, num_iterations=3)` | Test performance of a specific partition size with multiple iterations. Reads parquet with Dask using the given `blocksize` (bytes), measures elapsed time and memory delta per run. Returns a dict with `avg_time_sec`, `min_time_sec`, `max_time_sec`, `avg_memory_mb`, `max_memory_mb`, and iteration count. |
 
 **Type Hints & Docstrings:** All functions fully documented with comprehensive docstrings.
 
