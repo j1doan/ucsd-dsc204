@@ -380,3 +380,42 @@ def test_partition_size(
         'avg_memory_mb': sum(memories) / len(memories),
         'max_memory_mb': max(memories),
     }
+
+# ============================================================================
+# Demo: test candidate sizes (50MB–1GB), measure time/memory, pick best within max_memory_usage
+# ============================================================================
+
+if __name__ == "__main__":
+    import sys
+
+    # Default: one S3 taxi parquet (or pass a local path: python partition_optimization.py /path/to/file.parquet)
+    DEFAULT_FILE = "s3://dsc291-ucsd/taxi/Dataset/2021/yellow_taxi/yellow_tripdata_2021-01.parquet"
+    file_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_FILE
+
+    # Optional: max memory cap (e.g. 2GB). If not set, script uses 80% of available.
+    MAX_MEMORY_STR = "2GB"
+    max_memory_usage = parse_size(MAX_MEMORY_STR)
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    print("=== Partition size optimization demo ===\n")
+    print(f"File: {file_path}")
+    print(f"Candidate range: 50MB – 1GB (log-spaced)")
+    print(f"Max memory: {MAX_MEMORY_STR}\n")
+
+    result = find_optimal_partition_size(
+        file_path,
+        size_range=("50MB", "1GB"),
+        num_sizes=6,
+        max_memory_usage=max_memory_usage,
+        warmup=True,
+    )
+
+    print("\n--- Results ---")
+    max_mb = result["max_memory_usage"] / (1024 ** 2)
+    for r in result["results"]:
+        status = "ok" if r["success"] and r["peak_memory_mb"] < max_mb else ("fail" if not r["success"] else "over")
+        t = r["elapsed_time_sec"]
+        m = r["peak_memory_mb"]
+        err = f" | {r['error']}" if r.get("error") else ""
+        print(f"  {r['partition_size_str']:>8}  time={t:.2f}s  peak_mem={m:.1f}MB  [{status}]{err}")
+    print(f"\nOptimal (within limit): {result['optimal_size_str']}\n")
