@@ -40,6 +40,8 @@ def process_single_file(
     min_rides: int = 50,
     partition_size: Optional[int] = None,
     taxi_type: Optional[str] = None,
+    common_schema: Optional[Dict[str, str]] = None,
+    storage_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Process a single parquet file through the pivot pipeline.
@@ -52,7 +54,8 @@ def process_single_file(
     5. Pivot to wide format (hour_0...hour_23)
     6. Cleanup rows with < min_rides
     7. Write intermediate parquet file
-    8. Count month-mismatch rows
+    8. Count and drop month-mismatch rows
+    9. Drop rows with invalid datetime
     
     Args:
         file_path: Path to input parquet file (local or S3)
@@ -60,6 +63,8 @@ def process_single_file(
         min_rides: Minimum rides per row threshold (default 50)
         partition_size: Optional blocksize for dask reading
         taxi_type: Override taxi type detection from path
+        common_schema: Optional schema mapping for normalization
+        storage_options: Optional storage options for S3 access
         
     Returns:
         Dict with results:
@@ -68,7 +73,8 @@ def process_single_file(
             - 'input_rows': Rows read from input
             - 'output_rows': Rows in pivoted output
             - 'removed_rows': Rows removed due to min_rides filtering
-            - 'month_mismatch_rows': Rows where row month != file month
+            - 'month_mismatch_rows': Rows where row month != file month (dropped)
+            - 'parse_fail_rows': Rows dropped due to invalid datetime parsing
             - 'month_mismatch_files': Count of files with mismatches
             - 'expected_month': (year, month) from path
             - 'processing_time_sec': Elapsed time
@@ -110,9 +116,11 @@ def process_single_file(
         result['taxi_type'] = inferred_taxi
         
         # Read parquet file using dask
-        read_kwargs = {}
+        read_kwargs: Dict[str, Any] = {}
         if partition_size is not None:
             read_kwargs['blocksize'] = partition_size
+        if storage_options:
+            read_kwargs['storage_options'] = storage_options
         
         logger.info(f"Reading parquet file: {file_path}")
         ddf = pu.read_parquet_with_dask(file_path, **read_kwargs)
@@ -122,10 +130,15 @@ def process_single_file(
         input_rows = len(df)
         result['input_rows'] = input_rows
         logger.info(f"Read {input_rows} rows from {file_path}")
+
+        # Normalize schema if available
+        if common_schema:
+            df = pu.normalize_schema(df, common_schema)
         
-        # Detect columns
-        datetime_col = pu.find_pickup_datetime_col(df.columns.tolist())
-        location_col = pu.find_pickup_location_col(df.columns.tolist())
+        # Detect columns (prefer standardized names if present)
+        columns = df.columns.tolist()
+        datetime_col = 'pickup_datetime' if 'pickup_datetime' in columns else pu.find_pickup_datetime_col(columns)
+        location_col = 'pickup_location' if 'pickup_location' in columns else pu.find_pickup_location_col(columns)
         
         if datetime_col is None:
             raise ValueError("Could not find pickup datetime column")
@@ -139,13 +152,20 @@ def process_single_file(
         # Convert datetime column to ensure it's datetime type
         if not pd.api.types.is_datetime64_any_dtype(df[datetime_col]):
             df[datetime_col] = pd.to_datetime(df[datetime_col], errors='coerce')
+
+        # Drop rows with invalid datetime
+        parse_fail_rows = int(df[datetime_col].isna().sum())
+        if parse_fail_rows:
+            logger.warning(f"Dropping {parse_fail_rows} rows with invalid datetime")
+            df = df[df[datetime_col].notna()]
+        result['parse_fail_rows'] = parse_fail_rows
         
         # Extract date for month-mismatch detection
         df['_row_date'] = df[datetime_col].dt.date
         df['_row_month'] = df[datetime_col].dt.month
         df['_row_year'] = df[datetime_col].dt.year
         
-        # Count month mismatches before cleaning
+        # Count month mismatches and drop them
         month_mismatch_count = 0
         if expected_month[0] is not None and expected_month[1] is not None:
             mismatches = df[
@@ -158,6 +178,8 @@ def process_single_file(
                     f"Found {month_mismatch_count} rows with month mismatch "
                     f"(expected {expected_month[0]}-{expected_month[1]:02d})"
                 )
+                # Drop mismatched rows from further processing
+                df = df.drop(mismatches.index)
         
         result['month_mismatch_rows'] = month_mismatch_count
         
@@ -189,7 +211,10 @@ def process_single_file(
         
         # Write to parquet
         logger.info(f"Writing output to {output_path}")
-        df_cleaned.to_parquet(output_path, engine='pyarrow')
+        write_kwargs: Dict[str, Any] = {'engine': 'pyarrow'}
+        if storage_options and pu.is_s3_path(output_path):
+            write_kwargs['storage_options'] = storage_options
+        df_cleaned.to_parquet(output_path, **write_kwargs)
         
         result['output_path'] = output_path
         result['success'] = True
@@ -207,6 +232,7 @@ def process_single_file(
 def combine_into_wide_table(
     intermediate_dir: str,
     output_path: str,
+    storage_options: Optional[Dict[str, Any]] = None,
 ) -> Tuple[int, Dict[str, Any]]:
     """
     Combine all intermediate pivoted tables into a single wide table.
@@ -221,6 +247,7 @@ def combine_into_wide_table(
     Args:
         intermediate_dir: Directory containing intermediate parquet files
         output_path: Path for final wide table (local or S3)
+        storage_options: Optional storage options for S3 access
         
     Returns:
         Tuple of (output_row_count, stats_dict)
@@ -238,8 +265,18 @@ def combine_into_wide_table(
     logger.info(f"Combining intermediate files from {intermediate_dir}")
     
     # Discover intermediate files
-    intermediate_path = Path(intermediate_dir)
-    parquet_files = sorted(intermediate_path.glob('*_pivoted.parquet'))
+    parquet_files: List[str] = []
+    if pu.is_s3_path(intermediate_dir):
+        fs = pu.get_filesystem(intermediate_dir)
+        pattern = intermediate_dir.rstrip('/') + '/*_pivoted.parquet'
+        parquet_files = [
+            f's3://{f}' if not f.startswith('s3://') else f
+            for f in fs.glob(pattern)
+        ]
+        parquet_files = sorted(parquet_files)
+    else:
+        intermediate_path = Path(intermediate_dir)
+        parquet_files = sorted(str(p) for p in intermediate_path.glob('*_pivoted.parquet'))
     
     if not parquet_files:
         logger.warning(f"No intermediate parquet files found in {intermediate_dir}")
@@ -254,7 +291,10 @@ def combine_into_wide_table(
         
         for pf in parquet_files:
             logger.info(f"Reading intermediate file: {pf}")
-            ddf = dd.read_parquet(str(pf))
+            if storage_options and pu.is_s3_path(pf):
+                ddf = dd.read_parquet(str(pf), storage_options=storage_options)
+            else:
+                ddf = dd.read_parquet(str(pf))
             
             # Get row count
             n_rows = len(ddf)
@@ -295,7 +335,10 @@ def combine_into_wide_table(
         
         # Write to parquet
         logger.info(f"Writing wide table to {output_path}")
-        df_wide.to_parquet(output_path, engine='pyarrow')
+        write_kwargs: Dict[str, Any] = {'engine': 'pyarrow'}
+        if storage_options and pu.is_s3_path(output_path):
+            write_kwargs['storage_options'] = storage_options
+        df_wide.to_parquet(output_path, **write_kwargs)
         
         stats = {
             'output_rows': output_rows,
@@ -322,19 +365,18 @@ def generate_report(
     """
     Generate performance and processing report.
     
-    Creates a JSON report with:
+    Outputs a small .tex report by default (or JSON if output_file ends with .json).
+    Includes:
     - Total runtime (wall-clock)
     - Peak memory usage
     - Input/output row counts
     - Breakdown of discarded rows
     - Month-mismatch statistics
-    - Resource utilization
     
     Args:
         stats: Dictionary with pipeline statistics
-        output_file: Target file for report (JSON format)
+        output_file: Target file for report (.tex or .json)
     """
-    
     logger.info(f"Generating report to {output_file}")
     
     try:
@@ -348,9 +390,35 @@ def generate_report(
             'peak_memory_mb': stats.get('peak_memory_mb', 'unknown'),
         }
         
-        # Write to JSON
-        with open(output_file, 'w') as f:
-            json.dump(stats, f, indent=2, default=str)
+        if output_file.lower().endswith('.json'):
+            with open(output_file, 'w') as f:
+                json.dump(stats, f, indent=2, default=str)
+        else:
+            total_runtime = stats.get('total_runtime_sec', 'N/A')
+            total_input = stats.get('total_input_rows', 'N/A')
+            total_output = stats.get('wide_table_rows', stats.get('total_output_rows', 'N/A'))
+            total_discarded = stats.get('total_discarded_rows', 'N/A')
+            total_mismatches = stats.get('total_month_mismatches', 'N/A')
+            peak_memory = stats.get('peak_memory_mb', 'N/A')
+            parse_fails = stats.get('total_parse_fail_rows', 0)
+            low_count = stats.get('total_removed_rows', 0)
+            
+            tex_lines = [
+                r"\section*{Pipeline Report}",
+                r"\begin{itemize}",
+                f"  \\item Total runtime (sec): {total_runtime}",
+                f"  \\item Peak memory (MB): {peak_memory}",
+                f"  \\item Total input rows: {total_input}",
+                f"  \\item Total output rows: {total_output}",
+                f"  \\item Total discarded rows: {total_discarded}",
+                f"  \\item Month-mismatch rows: {total_mismatches}",
+                f"  \\item Parse failures (datetime): {parse_fails}",
+                f"  \\item Low-count rows removed: {low_count}",
+                r"\end{itemize}",
+            ]
+            
+            with open(output_file, 'w') as f:
+                f.write("\n".join(tex_lines))
         
         logger.info(f"Report written to {output_file}")
         
@@ -358,9 +426,14 @@ def generate_report(
         print("\n" + "="*60)
         print("PIPELINE SUMMARY REPORT")
         print("="*60)
-        print(f"Total runtime: {stats.get('total_runtime_sec', 'N/A'):.2f}s")
+        total_runtime = stats.get('total_runtime_sec', None)
+        if isinstance(total_runtime, (int, float)):
+            runtime_str = f"{total_runtime:.2f}s"
+        else:
+            runtime_str = "N/A"
+        print(f"Total runtime: {runtime_str}")
         print(f"Input rows: {stats.get('total_input_rows', 'N/A')}")
-        print(f"Output rows: {stats.get('total_output_rows', 'N/A')}")
+        print(f"Output rows: {stats.get('wide_table_rows', stats.get('total_output_rows', 'N/A'))}")
         print(f"Discarded rows: {stats.get('total_discarded_rows', 'N/A')}")
         print(f"Month-mismatch rows: {stats.get('total_month_mismatches', 'N/A')}")
         print("="*60 + "\n")
@@ -398,6 +471,8 @@ def process_month_files(
     min_rides: int = 50,
     partition_size: Optional[int] = None,
     num_workers: int = 1,
+    common_schema: Optional[Dict[str, str]] = None,
+    storage_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Process all files for a specific month.
@@ -410,6 +485,8 @@ def process_month_files(
         min_rides: Minimum rides threshold
         partition_size: Optional blocksize for dask
         num_workers: Number of parallel workers
+        common_schema: Optional schema mapping for normalization
+        storage_options: Optional storage options for S3 access
         
     Returns:
         Dict with aggregated stats for the month
@@ -422,13 +499,14 @@ def process_month_files(
         'total_output_rows': 0,
         'total_removed_rows': 0,
         'total_month_mismatches': 0,
+        'total_parse_fail_rows': 0,
         'file_results': [],
         'errors': 0,
     }
     
     # Prepare arguments for multiprocessing
     task_args = [
-        (f, output_dir, min_rides, partition_size, None)
+        (f, output_dir, min_rides, partition_size, None, common_schema, storage_options)
         for f in files
     ]
     
@@ -449,6 +527,7 @@ def process_month_files(
             month_stats['total_output_rows'] += result.get('output_rows', 0)
             month_stats['total_removed_rows'] += result.get('removed_rows', 0)
             month_stats['total_month_mismatches'] += result.get('month_mismatch_rows', 0)
+            month_stats['total_parse_fail_rows'] += result.get('parse_fail_rows', 0)
         else:
             month_stats['errors'] += 1
             logger.error(f"Failed to process {result['file_path']}: {result['error']}")
@@ -508,8 +587,8 @@ def main():
         help='Keep intermediate pivot files after combining'
     )
     parser.add_argument(
-        '--report-file', type=str, default='pipeline_report.json',
-        help='Output file for pipeline report (JSON)'
+        '--report-file', type=str, default='pipeline_report.tex',
+        help='Output file for pipeline report (.tex or .json)'
     )
     
     args = parser.parse_args()
@@ -528,6 +607,8 @@ def main():
             'total_output_rows': 0,
             'total_discarded_rows': 0,
             'total_month_mismatches': 0,
+            'total_parse_fail_rows': 0,
+            'total_removed_rows': 0,
             'num_files_processed': 0,
             'num_errors': 0,
             'month_stats': {},
@@ -548,8 +629,9 @@ def main():
         
         # Step 2: Check schema consistency
         logger.info("Step 2: Checking schema consistency...")
+        common_schema: Optional[Dict[str, str]] = None
         try:
-            common_schema = pu.get_common_schema(file_list[:min(3, len(file_list))])
+            common_schema = pu.get_common_schema(file_list)
             logger.info(f"Common schema detected: {common_schema}")
             pipeline_stats['common_schema'] = common_schema
         except Exception as e:
@@ -560,11 +642,29 @@ def main():
         files_by_month = group_files_by_month(file_list)
         logger.info(f"Grouped into {len(files_by_month)} months")
         
-        # Optional: Parse partition size
+        # Determine storage options for S3 (if needed)
+        storage_options: Optional[Dict[str, Any]] = None
+        if pu.is_s3_path(args.input_dir) or (args.s3_output and pu.is_s3_path(args.s3_output)):
+            storage_options = pu.get_storage_options(args.input_dir if pu.is_s3_path(args.input_dir) else args.s3_output)
+
+        # Optional: Parse/optimize partition size
         partition_size = None
         if args.partition_size:
             partition_size = popt.parse_size(args.partition_size)
             logger.info(f"Using partition size: {popt.format_size(partition_size)}")
+        elif not args.skip_partition_optimization:
+            sample_file = file_list[0]
+            if pu.is_s3_path(sample_file):
+                logger.warning(
+                    "Skipping partition optimization for S3 inputs. "
+                    "Provide --partition-size to set manually."
+                )
+            else:
+                logger.info("Running partition size optimization on a sample file...")
+                opt = popt.find_optimal_partition_size(sample_file, size_range=("50MB", "1GB"), num_sizes=5)
+                partition_size = opt.get('optimal_size')
+                if partition_size:
+                    logger.info(f"Selected partition size: {popt.format_size(partition_size)}")
         
         # Step 4: Create intermediate output directory
         intermediate_dir = Path(args.output_dir) / 'intermediate'
@@ -588,14 +688,17 @@ def main():
                 min_rides=args.min_rides,
                 partition_size=partition_size,
                 num_workers=args.workers,
+                common_schema=common_schema,
+                storage_options=storage_options,
             )
             month_result['processing_time_sec'] = time.time() - month_process_start
             
             pipeline_stats['month_stats'][month_str] = month_result
             pipeline_stats['total_input_rows'] += month_result['total_input_rows']
             pipeline_stats['total_output_rows'] += month_result['total_output_rows']
-            pipeline_stats['total_discarded_rows'] += month_result['total_removed_rows']
+            pipeline_stats['total_removed_rows'] += month_result['total_removed_rows']
             pipeline_stats['total_month_mismatches'] += month_result['total_month_mismatches']
+            pipeline_stats['total_parse_fail_rows'] += month_result['total_parse_fail_rows']
             pipeline_stats['num_files_processed'] += len(month_files)
             pipeline_stats['num_errors'] += month_result['errors']
             
@@ -605,6 +708,12 @@ def main():
                     f"Month {month_str}: {month_result['total_month_mismatches']} "
                     f"rows had date mismatches"
                 )
+        
+        # Month mismatch breakdown
+        pipeline_stats['month_mismatch_by_month'] = {
+            month: stats.get('total_month_mismatches', 0)
+            for month, stats in pipeline_stats['month_stats'].items()
+        }
         
         # Step 6: Combine into wide table
         logger.info("\nStep 5: Combining intermediate files into single wide table...")
@@ -618,7 +727,8 @@ def main():
         
         wide_rows, combine_stats = combine_into_wide_table(
             str(intermediate_dir),
-            final_output_path
+            final_output_path,
+            storage_options=storage_options,
         )
         
         pipeline_stats['wide_table_rows'] = wide_rows
@@ -634,6 +744,11 @@ def main():
         # Step 8: Generate report
         logger.info("\nStep 6: Generating pipeline report...")
         pipeline_stats['total_runtime_sec'] = time.time() - pipeline_start
+        pipeline_stats['total_discarded_rows'] = (
+            pipeline_stats['total_removed_rows']
+            + pipeline_stats['total_month_mismatches']
+            + pipeline_stats['total_parse_fail_rows']
+        )
         
         # Add memory info
         process = psutil.Process(os.getpid())
