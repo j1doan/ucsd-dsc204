@@ -29,6 +29,13 @@ import partition_optimization as popt
 
 logger = logging.getLogger(__name__)
 
+# Optional S3 write support via fsspec
+try:
+    import fsspec
+    HAS_FSSPEC = True
+except ImportError:
+    HAS_FSSPEC = False
+
 # Global peak memory tracker
 _peak_memory_mb = 0.0
 _process = psutil.Process(os.getpid())
@@ -43,6 +50,46 @@ def get_current_memory_mb() -> float:
         return current_mb
     except Exception:
         return 0.0
+
+
+def _join_output_path(base_dir: str, filename: str) -> str:
+    """Join an output directory with a filename for local or S3 paths."""
+    if pu.is_s3_path(base_dir):
+        return base_dir.rstrip('/') + '/' + filename
+    return str(Path(base_dir) / filename)
+
+
+def _open_output_file(path: str, storage_options: Optional[Dict[str, Any]] = None):
+    """Open a local or S3 path for writing."""
+    if pu.is_s3_path(path):
+        if not HAS_FSSPEC:
+            raise ImportError(
+                "fsspec is required for S3 writes. Install with: pip install fsspec s3fs"
+            )
+        return fsspec.open(path, mode='w', **(storage_options or {})).open()
+    return open(path, 'w')
+
+
+def _delete_s3_prefix(path: str, storage_options: Optional[Dict[str, Any]] = None) -> None:
+    """Delete an S3 prefix recursively."""
+    if not pu.is_s3_path(path):
+        return
+    if not HAS_FSSPEC:
+        raise ImportError(
+            "fsspec is required for S3 deletes. Install with: pip install fsspec s3fs"
+        )
+    fs = fsspec.filesystem('s3', **(storage_options or {}))
+    fs.rm(path.replace('s3://', '', 1), recursive=True)
+
+
+def _default_local_intermediate_dir() -> str:
+    """Choose a fast local temp directory for intermediate files."""
+    shm_path = Path('/dev/shm')
+    if shm_path.exists() and os.access(str(shm_path), os.W_OK):
+        base = shm_path
+    else:
+        base = Path('/tmp')
+    return str(base / f"taxi-pivot-intermediate-{int(time.time())}")
 
 
 # Configure logging
@@ -63,7 +110,8 @@ def process_single_file(
     partition_size: Optional[int] = None,
     taxi_type: Optional[str] = None,
     common_schema: Optional[Dict[str, str]] = None,
-    storage_options: Optional[Dict[str, Any]] = None,
+    read_storage_options: Optional[Dict[str, Any]] = None,
+    write_storage_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Process a single parquet file through the pivot pipeline.
@@ -86,7 +134,8 @@ def process_single_file(
         partition_size: Optional blocksize for dask reading
         taxi_type: Override taxi type detection from path
         common_schema: Optional schema mapping for normalization
-        storage_options: Optional storage options for S3 access
+        read_storage_options: Optional storage options for S3 reads
+        write_storage_options: Optional storage options for S3 writes
         
     Returns:
         Dict with results:
@@ -117,6 +166,7 @@ def process_single_file(
             'month_mismatch': 0,
             'low_count': 0,
         },
+        'raw_rows_after_filters': 0,
         'processing_time_sec': 0.0,
         'memory_delta_mb': 0.0,
     }
@@ -128,7 +178,8 @@ def process_single_file(
         logger.info(f"Processing file: {file_path}")
         
         # Create output directory if needed
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        if not pu.is_s3_path(output_dir):
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
         
         # Infer expected month from path
         expected_month = pu.infer_month_from_path(file_path)
@@ -153,8 +204,8 @@ def process_single_file(
         read_kwargs: Dict[str, Any] = {}
         if partition_size is not None:
             read_kwargs['blocksize'] = partition_size
-        if storage_options:
-            read_kwargs['storage_options'] = storage_options
+        if read_storage_options:
+            read_kwargs['storage_options'] = read_storage_options
         
         logger.info(f"Reading parquet file: {file_path}")
         ddf = pu.read_parquet_with_dask(file_path, **read_kwargs)
@@ -216,6 +267,17 @@ def process_single_file(
                 df = df.drop(mismatches.index)
         
         result['discarded_rows']['month_mismatch'] = month_mismatch_count
+
+        # Raw-stage row accounting (trip rows) after parse/month filters.
+        result['raw_rows_after_filters'] = result['input_rows'] - (
+            result['discarded_rows']['parse_failure']
+            + result['discarded_rows']['month_mismatch']
+        )
+        if result['raw_rows_after_filters'] < 0:
+            raise ValueError(
+                f"Negative raw_rows_after_filters for {file_path}: "
+                f"{result['raw_rows_after_filters']}"
+            )
         
         # Pivot the data
         logger.info("Pivoting data...")
@@ -241,13 +303,13 @@ def process_single_file(
         
         # Generate output filename
         file_stem = Path(file_path).stem
-        output_path = str(Path(output_dir) / f"{file_stem}_pivoted.parquet")
+        output_path = _join_output_path(output_dir, f"{file_stem}_pivoted.parquet")
         
         # Write to parquet
         logger.info(f"Writing output to {output_path}")
         write_kwargs: Dict[str, Any] = {'engine': 'pyarrow'}
-        if storage_options and pu.is_s3_path(output_path):
-            write_kwargs['storage_options'] = storage_options
+        if write_storage_options and pu.is_s3_path(output_path):
+            write_kwargs['storage_options'] = write_storage_options
         df_cleaned.to_parquet(output_path, **write_kwargs)
         
         result['output_path'] = output_path
@@ -269,6 +331,7 @@ def process_single_file(
 def combine_into_wide_table(
     intermediate_dir: str,
     output_path: str,
+    intermediate_files: Optional[List[str]] = None,
     read_storage_options: Optional[Dict[str, Any]] = None,
     write_storage_options: Optional[Dict[str, Any]] = None,
 ) -> Tuple[int, Dict[str, Any]]:
@@ -285,6 +348,7 @@ def combine_into_wide_table(
     Args:
         intermediate_dir: Directory containing intermediate parquet files
         output_path: Path for final wide table (local or S3)
+        intermediate_files: Optional explicit list of intermediate parquet files
         storage_options: Optional storage options for S3 access
         
     Returns:
@@ -305,9 +369,12 @@ def combine_into_wide_table(
     
     logger.info(f"Combining intermediate files from {intermediate_dir}")
     
-    # Discover intermediate files
+    # Discover intermediate files unless explicitly provided.
+    # Providing the list avoids S3 LIST permissions on private output buckets.
     parquet_files: List[str] = []
-    if pu.is_s3_path(intermediate_dir):
+    if intermediate_files:
+        parquet_files = sorted(intermediate_files)
+    elif pu.is_s3_path(intermediate_dir):
         fs = pu.get_filesystem(intermediate_dir)
         pattern = intermediate_dir.rstrip('/') + '/*_pivoted.parquet'
         parquet_files = [
@@ -423,6 +490,7 @@ def combine_into_wide_table(
 def generate_report(
     stats: Dict[str, Any],
     output_file: str,
+    write_storage_options: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Generate performance and processing report.
@@ -438,12 +506,14 @@ def generate_report(
     Args:
         stats: Dictionary with pipeline statistics
         output_file: Target file for report (.tex or .json)
+        write_storage_options: Optional storage options for S3 writes
     """
     logger.info(f"Generating report to {output_file}")
     
     try:
-        # Create output directory if needed
-        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        # Create output directory if needed (local only)
+        if not pu.is_s3_path(output_file):
+            Path(output_file).parent.mkdir(parents=True, exist_ok=True)
         
         # Add system info
         process = psutil.Process(os.getpid())
@@ -458,8 +528,12 @@ def generate_report(
                 'timestamp': datetime.now().isoformat(),
                 'summary': {
                     'total_runtime_seconds': stats.get('total_runtime_sec', 0),
-                    'input_rows_total': stats.get('total_input_rows', 0),
-                    'output_rows_total': stats.get('wide_table_rows', stats.get('total_output_rows', 0)),
+                    'input_rows_total_raw': stats.get('total_input_rows', 0),
+                    'raw_rows_after_filters': stats.get('total_raw_rows_after_filters', 0),
+                    'intermediate_rows_total': stats.get('total_output_rows', 0),
+                    'output_rows_total_wide': stats.get('wide_table_rows', stats.get('total_output_rows', 0)),
+                    'discarded_rows_raw_total': stats.get('total_discarded_raw_rows', 0),
+                    'discarded_rows_pivot_total': stats.get('total_discarded_pivot_rows', 0),
                     'discarded_rows_total': stats.get('total_discarded_rows', 0),
                 },
                 'memory': {
@@ -481,11 +555,12 @@ def generate_report(
                 for file_result in month_data.get('file_results', []):
                     report['per_file_stats'].append(file_result)
             
-            with open(output_file, 'w') as f:
+            with _open_output_file(output_file, write_storage_options) as f:
                 json.dump(report, f, indent=2, default=str)
         else:
             total_runtime = stats.get('total_runtime_sec', 'N/A')
             total_input = stats.get('total_input_rows', 'N/A')
+            total_raw_after_filters = stats.get('total_raw_rows_after_filters', 'N/A')
             total_output = stats.get('wide_table_rows', stats.get('total_output_rows', 'N/A'))
             total_discarded = stats.get('total_discarded_rows', 'N/A')
             total_discarded_raw = stats.get('total_discarded_raw_rows', 'N/A')
@@ -506,8 +581,9 @@ def generate_report(
                 f"  \\item Total runtime (sec): {total_runtime}",
                 f"  \\item Peak memory (MB): {peak_memory}",
                 f"  \\item Total input rows: {total_input}",
+                f"  \\item Raw rows after parse/month filters: {total_raw_after_filters}",
                 f"  \\item Total output rows: {total_output}",
-                f"  \\item Total discarded rows: {total_discarded}",
+                f"  \\item Total discarded rows (raw stage): {total_discarded}",
                 f"  \\item Discarded raw rows: {total_discarded_raw}",
                 f"  \\item Discarded raw pct: {discarded_raw_pct}",
                 f"  \\item Discarded pivot rows: {total_discarded_pivot}",
@@ -521,7 +597,7 @@ def generate_report(
                 r"\end{itemize}",
             ]
             
-            with open(output_file, 'w') as f:
+            with _open_output_file(output_file, write_storage_options) as f:
                 f.write("\n".join(tex_lines))
         
         logger.info(f"Report written to {output_file}")
@@ -538,9 +614,11 @@ def generate_report(
             runtime_str = "N/A"
         print(f"Total runtime: {runtime_str}")
         print(f"Input rows: {stats.get('total_input_rows', 'N/A'):,}")
+        print(f"Raw rows after parse/month filters: {stats.get('total_raw_rows_after_filters', 'N/A'):,}")
+        print(f"Intermediate output rows (sum of per-file pivot outputs): {stats.get('total_output_rows', 'N/A'):,}")
         print(f"Output rows: {stats.get('wide_table_rows', stats.get('total_output_rows', 'N/A')):,}")
-        print(f"Discarded rows: {stats.get('total_discarded_rows', 'N/A'):,}")
-        print(f"  - Low-count cleanup: {stats.get('total_removed_rows', 0):,}")
+        print(f"Discarded rows (raw stage): {stats.get('total_discarded_rows', 'N/A'):,}")
+        print(f"  - Low-count cleanup (pivot stage): {stats.get('total_removed_rows', 0):,}")
         print(f"  - Parse failures: {stats.get('total_parse_fail_rows', 0):,}")
         print(f"  - Month-mismatch: {stats.get('total_month_mismatches', 0):,}")
         print(f"\nMemory:")
@@ -581,7 +659,8 @@ def process_month_files(
     partition_size: Optional[int] = None,
     num_workers: int = 1,
     common_schema: Optional[Dict[str, str]] = None,
-    storage_options: Optional[Dict[str, Any]] = None,
+    read_storage_options: Optional[Dict[str, Any]] = None,
+    write_storage_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Process all files for a specific month.
@@ -595,7 +674,8 @@ def process_month_files(
         partition_size: Optional blocksize for dask
         num_workers: Number of parallel workers
         common_schema: Optional schema mapping for normalization
-        storage_options: Optional storage options for S3 access
+        read_storage_options: Optional storage options for S3 reads
+        write_storage_options: Optional storage options for S3 writes
         
     Returns:
         Dict with aggregated stats for the month
@@ -605,6 +685,7 @@ def process_month_files(
     
     month_stats = {
         'total_input_rows': 0,
+        'total_raw_rows_after_filters': 0,
         'total_output_rows': 0,
         'total_removed_rows': 0,
         'total_month_mismatches': 0,
@@ -616,7 +697,7 @@ def process_month_files(
     
     # Prepare arguments for multiprocessing
     task_args = [
-        (f, output_dir, min_rides, partition_size, None, common_schema, storage_options)
+        (f, output_dir, min_rides, partition_size, None, common_schema, read_storage_options, write_storage_options)
         for f in files
     ]
     
@@ -643,6 +724,7 @@ def process_month_files(
         
         if result['success']:
             month_stats['total_input_rows'] += result.get('input_rows', 0)
+            month_stats['total_raw_rows_after_filters'] += result.get('raw_rows_after_filters', 0)
             month_stats['total_output_rows'] += result.get('output_rows', 0)
             month_stats['total_removed_rows'] += result.get('discarded_rows', {}).get('low_count', 0)
             month_stats['total_month_mismatches'] += result.get('discarded_rows', {}).get('month_mismatch', 0)
@@ -708,6 +790,13 @@ def main():
         help='Keep intermediate pivot files after combining'
     )
     parser.add_argument(
+        '--intermediate-dir', type=str, default=None,
+        help=(
+            'Intermediate output directory (local or S3). '
+            'If omitted and --output-dir is S3, a fast local temp dir is used.'
+        )
+    )
+    parser.add_argument(
         '--report-file', type=str, default='pipeline_report.tex',
         help='Output file for pipeline report (.tex or .json)'
     )
@@ -730,6 +819,7 @@ def main():
             'min_rides': args.min_rides,
             'workers': args.workers,
             'total_input_rows': 0,
+            'total_raw_rows_after_filters': 0,
             'total_output_rows': 0,
             'total_discarded_rows': 0,
             'total_discarded_raw_rows': 0,
@@ -794,7 +884,7 @@ def main():
         if pu.is_s3_path(args.input_dir):
             # Input bucket may be public; use default (anon=True)
             read_storage_options = pu.get_storage_options(args.input_dir)
-        if args.s3_output and pu.is_s3_path(args.s3_output):
+        if (args.s3_output and pu.is_s3_path(args.s3_output)) or pu.is_s3_path(args.output_dir):
             # Output bucket is private; force authenticated access
             write_storage_options = {'anon': False}
             access_key = os.getenv("AWS_ACCESS_KEY_ID")
@@ -830,9 +920,21 @@ def main():
                 if partition_size:
                     logger.info(f"Selected partition size: {popt.format_size(partition_size)}")
         
-        # Step 4: Create intermediate output directory
-        intermediate_dir = Path(args.output_dir) / 'intermediate'
-        intermediate_dir.mkdir(parents=True, exist_ok=True)
+        # Step 4: Create intermediate output directory (prefer local for S3 outputs)
+        if args.intermediate_dir:
+            intermediate_dir = args.intermediate_dir
+        elif pu.is_s3_path(args.output_dir):
+            intermediate_dir = _default_local_intermediate_dir()
+            logger.info(
+                "Using local intermediate dir to reduce S3 write I/O: %s",
+                intermediate_dir,
+            )
+        else:
+            intermediate_dir = str(Path(args.output_dir) / 'intermediate')
+
+        if not pu.is_s3_path(intermediate_dir):
+            Path(intermediate_dir).mkdir(parents=True, exist_ok=True)
+        pipeline_stats['intermediate_dir'] = intermediate_dir
         
         # Step 5: Process each month (month-at-a-time)
         logger.info("Step 4: Processing files month-at-a-time...")
@@ -864,12 +966,14 @@ def main():
                 partition_size=partition_size,
                 num_workers=args.workers,
                 common_schema=common_schema,
-                storage_options=read_storage_options,
+                read_storage_options=read_storage_options,
+                write_storage_options=write_storage_options,
             )
             month_result['processing_time_sec'] = time.time() - month_process_start
             
             pipeline_stats['month_stats'][month_str] = month_result
             pipeline_stats['total_input_rows'] += month_result['total_input_rows']
+            pipeline_stats['total_raw_rows_after_filters'] += month_result['total_raw_rows_after_filters']
             pipeline_stats['total_output_rows'] += month_result['total_output_rows']
             pipeline_stats['total_removed_rows'] += month_result['total_removed_rows']
             pipeline_stats['total_month_mismatches'] += month_result['total_month_mismatches']
@@ -888,6 +992,27 @@ def main():
         phase4_time = time.time() - phase4_start
         phase4_mem = get_current_memory_mb() - phase4_mem_start
         pipeline_stats['phase_stats']['processing'] = {'time': phase4_time, 'memory_mb': phase4_mem}
+
+        # Collect explicit intermediate file paths from successful file results.
+        # This allows combine step to avoid S3 listing permissions.
+        intermediate_files = sorted(
+            file_result['output_path']
+            for month_data in pipeline_stats['month_stats'].values()
+            for file_result in month_data.get('file_results', [])
+            if file_result.get('success') and file_result.get('output_path')
+        )
+        pipeline_stats['num_intermediate_files_expected'] = len(intermediate_files)
+
+        expected_raw_after_filters = pipeline_stats['total_input_rows'] - (
+            pipeline_stats['total_parse_fail_rows']
+            + pipeline_stats['total_month_mismatches']
+        )
+        if expected_raw_after_filters != pipeline_stats['total_raw_rows_after_filters']:
+            logger.warning(
+                "Raw row accounting mismatch: expected=%s observed=%s",
+                expected_raw_after_filters,
+                pipeline_stats['total_raw_rows_after_filters'],
+            )
         
         # Month mismatch breakdown
         pipeline_stats['month_mismatch_by_month'] = {
@@ -920,11 +1045,12 @@ def main():
         if args.s3_output:
             final_output_path = args.s3_output
         else:
-            final_output_path = str(Path(args.output_dir) / 'final_wide_table.parquet')
+            final_output_path = _join_output_path(args.output_dir, 'final_wide_table.parquet')
         
         wide_rows, combine_stats = combine_into_wide_table(
             str(intermediate_dir),
             final_output_path,
+            intermediate_files=intermediate_files,
             read_storage_options=read_storage_options,
             write_storage_options=write_storage_options,
         )
@@ -936,11 +1062,20 @@ def main():
         phase5_mem = get_current_memory_mb() - phase5_mem_start
         pipeline_stats['phase_stats']['combine'] = {'time': phase5_time, 'memory_mb': phase5_mem}
         pipeline_stats.update(combine_stats)
+        if pipeline_stats.get('intermediate_total_rows') != pipeline_stats.get('total_output_rows'):
+            logger.warning(
+                "Intermediate row accounting mismatch: combine_read=%s summed_per_file=%s",
+                pipeline_stats.get('intermediate_total_rows'),
+                pipeline_stats.get('total_output_rows'),
+            )
         
         # Step 7: Cleanup intermediates if not keeping
         if not args.keep_intermediate:
             logger.info("Cleaning up intermediate files...")
-            shutil.rmtree(intermediate_dir, ignore_errors=True)
+            if pu.is_s3_path(str(intermediate_dir)):
+                _delete_s3_prefix(str(intermediate_dir), write_storage_options)
+            else:
+                shutil.rmtree(intermediate_dir, ignore_errors=True)
         
         # Step 8: Generate report
         logger.info("\nStep 6: Generating pipeline report...")
@@ -950,11 +1085,8 @@ def main():
             + pipeline_stats['total_parse_fail_rows']
         )
         pipeline_stats['total_discarded_pivot_rows'] = pipeline_stats['total_removed_rows']
-        pipeline_stats['total_discarded_rows'] = (
-            pipeline_stats['total_removed_rows']
-            + pipeline_stats['total_month_mismatches']
-            + pipeline_stats['total_parse_fail_rows']
-        )
+        # Keep legacy field for compatibility; define it as raw-stage discards only.
+        pipeline_stats['total_discarded_rows'] = pipeline_stats['total_discarded_raw_rows']
         pipeline_stats['discarded_raw_pct'] = (
             (pipeline_stats['total_discarded_raw_rows'] / pipeline_stats['total_input_rows'])
             if pipeline_stats['total_input_rows'] else None
@@ -971,13 +1103,32 @@ def main():
         pipeline_stats['peak_memory_mb'] = _peak_memory_mb
         pipeline_stats['wall_clock_end'] = datetime.now().isoformat()
         
-        generate_report(pipeline_stats, args.report_file)
+        report_file = args.report_file
+        if (
+            pu.is_s3_path(args.output_dir)
+            and not pu.is_s3_path(report_file)
+            and not os.path.isabs(report_file)
+        ):
+            report_file = _join_output_path(args.output_dir, report_file)
+        generate_report(pipeline_stats, report_file, write_storage_options)
         
         logger.info("\n" + "="*60)
         logger.info("PIPELINE COMPLETED SUCCESSFULLY")
         logger.info("="*60)
         logger.info(f"Total runtime: {pipeline_stats['total_runtime_sec']:.2f}s")
         logger.info(f"Input rows: {pipeline_stats['total_input_rows']}")
+        logger.info(f"Raw rows after parse/month filters: {pipeline_stats['total_raw_rows_after_filters']}")
+        logger.info(
+            "Discarded raw rows: %s (parse=%s, month_mismatch=%s)",
+            pipeline_stats['total_discarded_raw_rows'],
+            pipeline_stats['total_parse_fail_rows'],
+            pipeline_stats['total_month_mismatches'],
+        )
+        logger.info(
+            "Discarded pivot rows: %s (low_count)",
+            pipeline_stats['total_discarded_pivot_rows'],
+        )
+        logger.info(f"Intermediate output rows (sum of per-file pivot outputs): {pipeline_stats['total_output_rows']}")
         logger.info(f"Output rows: {pipeline_stats['wide_table_rows']}")
         logger.info(f"Final table: {final_output_path}")
         logger.info("="*60)
