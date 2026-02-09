@@ -10,10 +10,19 @@ import re
 import time
 import psutil
 import os
-from typing import Optional, Tuple, Dict, Any, List
+import gc
+from typing import Optional, Tuple, Dict, Any, List, Iterator
 import logging
 import pyarrow.parquet as pq
 import dask.dataframe as dd
+
+import pivot_utils as pu
+
+try:
+    import fsspec
+    HAS_FSSPEC = True
+except ImportError:
+    HAS_FSSPEC = False
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +151,7 @@ def find_optimal_partition_size(
     num_sizes: int = 5,
     max_memory_usage: Optional[int] = None,
     warmup: bool = True,
+    storage_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Find optimal partition size for a parquet file using PyArrow batching.
@@ -186,10 +196,13 @@ def find_optimal_partition_size(
     
     # Get file size
     try:
-        pf = pq.ParquetFile(file_path)
+        pf, handle = _get_parquet_file(file_path, storage_options=storage_options)
         file_size_bytes = pf.metadata.serialized_size
     except Exception as e:
         raise ValueError(f"Could not read parquet file {file_path}: {e}")
+    finally:
+        if 'handle' in locals() and handle is not None:
+            handle.close()
     
     logger.info(f"Testing partition sizes for {file_path} ({format_size(file_size_bytes)})")
     
@@ -205,10 +218,13 @@ def find_optimal_partition_size(
             max_size = parse_size("1GB")
         
         # Generate logarithmically spaced candidates
-        candidate_sizes = [
-            int(min_size * (max_size / min_size) ** (i / (num_sizes - 1)))
-            for i in range(num_sizes)
-        ]
+        if num_sizes <= 1:
+            candidate_sizes = [min_size]
+        else:
+            candidate_sizes = [
+                int(min_size * (max_size / min_size) ** (i / (num_sizes - 1)))
+                for i in range(num_sizes)
+            ]
     
     if not candidate_sizes:
         raise ValueError("candidate_sizes cannot be empty")
@@ -224,7 +240,12 @@ def find_optimal_partition_size(
     if warmup:
         logger.info("Running warmup iteration...")
         try:
-            _ = dd.read_parquet(file_path, blocksize=candidate_sizes[0])
+            for _ in _iterate_batches(
+                file_path,
+                batch_size=candidate_sizes[0],
+                storage_options=storage_options,
+            ):
+                break
         except Exception as e:
             logger.warning(f"Warmup failed: {e}")
     
@@ -244,12 +265,17 @@ def find_optimal_partition_size(
             # Record start time and memory
             start_time = time.time()
             start_memory = get_process_memory_mb()
+            peak_memory_mb = start_memory
+            total_rows = 0
             
-            # Read with dask using blocksize (partition size)
-            df = dd.read_parquet(file_path, blocksize=partition_size)
-            
-            # Force computation to actually load and process data
-            _ = df.head(1)
+            # Iterate all batches using PyArrow
+            for batch in _iterate_batches(
+                file_path,
+                batch_size=partition_size,
+                storage_options=storage_options,
+            ):
+                total_rows += batch.num_rows
+                peak_memory_mb = max(peak_memory_mb, get_process_memory_mb())
             
             # Record end time and memory
             end_time = time.time()
@@ -257,19 +283,20 @@ def find_optimal_partition_size(
             
             elapsed_time = end_time - start_time
             memory_used = end_memory - start_memory
-            peak_memory = end_memory - baseline_memory
+            peak_memory = peak_memory_mb - baseline_memory
             
             test_result.update({
                 'elapsed_time_sec': elapsed_time,
                 'memory_used_mb': memory_used,
                 'peak_memory_mb': peak_memory,
+                'rows_processed': total_rows,
                 'success': True,
                 'error': None,
             })
             
             logger.info(
                 f"  Time: {elapsed_time:.2f}s | Memory: {memory_used:.1f}MB | "
-                f"Within limit: {peak_memory < (max_memory_usage / (1024**2))}"
+                f"Rows: {total_rows} | Within limit: {peak_memory < (max_memory_usage / (1024**2))}"
             )
             
         except Exception as e:
@@ -278,11 +305,13 @@ def find_optimal_partition_size(
                 'elapsed_time_sec': None,
                 'memory_used_mb': None,
                 'peak_memory_mb': None,
+                'rows_processed': None,
                 'success': False,
                 'error': str(e),
             })
         
         results.append(test_result)
+        gc.collect()
     
     # Select optimal size
     # Criteria: successful, within memory limit, balanced time/memory
@@ -327,6 +356,7 @@ def test_partition_size(
     file_path: str,
     partition_size: int,
     num_iterations: int = 3,
+    storage_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Test performance of a specific partition size with multiple iterations.
@@ -352,9 +382,14 @@ def test_partition_size(
         try:
             start_time = time.time()
             start_memory = get_process_memory_mb()
+            peak_memory_mb = start_memory
             
-            df = dd.read_parquet(file_path, blocksize=partition_size)
-            _ = df.head(1)
+            for batch in _iterate_batches(
+                file_path,
+                batch_size=partition_size,
+                storage_options=storage_options,
+            ):
+                peak_memory_mb = max(peak_memory_mb, get_process_memory_mb())
             
             elapsed = time.time() - start_time
             memory_delta = get_process_memory_mb() - start_memory
@@ -369,6 +404,8 @@ def test_partition_size(
         except Exception as e:
             logger.error(f"Error in iteration {i+1}: {e}")
             raise
+        finally:
+            gc.collect()
     
     return {
         'partition_size': partition_size,
@@ -380,6 +417,40 @@ def test_partition_size(
         'avg_memory_mb': sum(memories) / len(memories),
         'max_memory_mb': max(memories),
     }
+
+
+def _get_parquet_file(
+    file_path: str,
+    storage_options: Optional[Dict[str, Any]] = None,
+) -> Tuple[pq.ParquetFile, Optional[Any]]:
+    """
+    Return a ParquetFile and an optional open handle (for S3).
+    Caller must close handle if not None.
+    """
+    if pu.is_s3_path(file_path):
+        if not HAS_FSSPEC:
+            raise ImportError("fsspec is required for S3 Parquet access")
+        if storage_options is None:
+            storage_options = pu.get_storage_options(file_path)
+        fs = fsspec.filesystem("s3", **storage_options)
+        handle = fs.open(file_path, "rb")
+        return pq.ParquetFile(handle), handle
+    return pq.ParquetFile(file_path), None
+
+
+def _iterate_batches(
+    file_path: str,
+    batch_size: int,
+    storage_options: Optional[Dict[str, Any]] = None,
+) -> Iterator[Any]:
+    """Iterate through all record batches for a Parquet file."""
+    pf, handle = _get_parquet_file(file_path, storage_options=storage_options)
+    try:
+        for batch in pf.iter_batches(batch_size=batch_size):
+            yield batch
+    finally:
+        if handle is not None:
+            handle.close()
 
 # ============================================================================
 # Demo: test candidate sizes (50MB–1GB), measure time/memory, pick best within max_memory_usage

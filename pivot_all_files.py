@@ -644,10 +644,10 @@ def process_month_files(
         if result['success']:
             month_stats['total_input_rows'] += result.get('input_rows', 0)
             month_stats['total_output_rows'] += result.get('output_rows', 0)
-            month_stats['total_removed_rows'] += result.get('removed_rows', 0)
-            month_stats['total_month_mismatches'] += result.get('month_mismatch_rows', 0)
-            month_stats['total_parse_fail_rows'] += result.get('parse_fail_rows', 0)
-            if result.get('month_mismatch_rows', 0) > 0:
+            month_stats['total_removed_rows'] += result.get('discarded_rows', {}).get('low_count', 0)
+            month_stats['total_month_mismatches'] += result.get('discarded_rows', {}).get('month_mismatch', 0)
+            month_stats['total_parse_fail_rows'] += result.get('discarded_rows', {}).get('parse_failure', 0)
+            if result.get('discarded_rows', {}).get('month_mismatch', 0) > 0:
                 month_stats['files_with_month_mismatches'] += 1
         else:
             month_stats['errors'] += 1
@@ -898,6 +898,17 @@ def main():
             month: stats.get('files_with_month_mismatches', 0)
             for month, stats in pipeline_stats['month_stats'].items()
         }
+
+        logger.info(
+            "Month-mismatch totals: %s rows across %s files",
+            pipeline_stats['total_month_mismatches'],
+            pipeline_stats['files_with_month_mismatches'],
+        )
+        logger.info(
+            "Discarded rows: parse_failures=%s low_count=%s",
+            pipeline_stats['total_parse_fail_rows'],
+            pipeline_stats['total_removed_rows'],
+        )
         
         # Step 6: Combine into wide table
         logger.info("\nStep 5: Combining intermediate files into single wide table...")

@@ -234,13 +234,12 @@ def pivot_counts_date_taxi_type_location(
     if location_col is None:
         raise ValueError("Could not find pickup location column")
     
-    # If taxi_type_col not provided and not in columns, will be inferred from context
+    # If taxi_type_col not provided, require a taxi_type column
     if taxi_type_col is None:
         if 'taxi_type' in columns:
             taxi_type_col = 'taxi_type'
         else:
-            # Will be set by caller function
-            taxi_type_col = 'taxi_type'
+            raise ValueError("Could not find taxi type column")
     
     # Convert dask to pandas if needed
     is_dask = isinstance(df, dd.DataFrame)
@@ -295,7 +294,7 @@ def pivot_counts_date_taxi_type_location(
     pivoted = pivoted[hour_cols]
     
     # Rename index to standardized names
-    pivoted.index.names = [taxi_type_col, 'date', 'pickup_place']
+    pivoted.index.names = ['taxi_type', 'date', 'pickup_place']
     
     return pivoted
 
