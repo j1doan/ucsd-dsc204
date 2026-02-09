@@ -657,12 +657,16 @@ def generate_performance_md(
         total_raw_after = stats.get('total_raw_rows_after_filters')
         total_discarded_raw = stats.get('total_discarded_raw_rows')
         total_discarded_pivot = stats.get('total_discarded_pivot_rows')
-        total_discarded = stats.get('total_discarded_rows')
+        total_discarded = (
+            (stats.get('total_parse_fail_rows') or 0)
+            + (stats.get('total_month_mismatches') or 0)
+            + (stats.get('total_removed_rows') or 0)
+        )
         intermediate_rows = stats.get('total_output_rows')
         wide_rows = stats.get('wide_table_rows')
 
         discarded_raw_pct = _format_pct(total_discarded_raw, total_input)
-        discarded_pivot_pct = _format_pct(total_discarded_pivot, (intermediate_rows or 0) + (total_discarded_pivot or 0))
+        discarded_pivot_pct = _format_pct(total_discarded_pivot, total_input)
         discarded_total_pct = _format_pct(total_discarded, total_input)
 
         row_breakdown = stats.get('row_breakdown_by_year_and_taxi_type', {})
@@ -694,8 +698,8 @@ def generate_performance_md(
             "",
             "| Reason | Count | Percent of input |",
             "| --- | --- | --- |",
-            f"| Parse failures | {stats.get('total_parse_fail_rows')} | { _format_pct(stats.get('total_parse_fail_rows'), total_input) } |",
-            f"| Month mismatch | {stats.get('total_month_mismatches')} | { _format_pct(stats.get('total_month_mismatches'), total_input) } |",
+            f"| Parse failures | {stats.get('total_parse_fail_rows')} | {_format_pct(stats.get('total_parse_fail_rows'), total_input)} |",
+            f"| Month mismatch | {stats.get('total_month_mismatches')} | {_format_pct(stats.get('total_month_mismatches'), total_input)} |",
             f"| Low-count cleanup (pivot stage) | {stats.get('total_removed_rows')} | {discarded_pivot_pct} |",
             f"| Total discarded (raw stage) | {total_discarded_raw} | {discarded_raw_pct} |",
             f"| Total discarded (overall) | {total_discarded} | {discarded_total_pct} |",
