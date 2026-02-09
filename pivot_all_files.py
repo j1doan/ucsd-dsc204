@@ -641,6 +641,10 @@ def main():
         '--report-file', type=str, default='pipeline_report.tex',
         help='Output file for pipeline report (.tex or .json)'
     )
+    parser.add_argument(
+        '--max-files', type=int, default=None,
+        help='Maximum number of files to process (for testing; default None = process all)'
+    )
     
     args = parser.parse_args()
     
@@ -678,6 +682,13 @@ def main():
             return
         
         logger.info(f"Discovered {len(file_list)} parquet files")
+        
+        # Limit files if --max-files is specified (for testing)
+        if args.max_files is not None and args.max_files > 0:
+            original_count = len(file_list)
+            file_list = file_list[:args.max_files]
+            logger.warning(f"Limiting to {args.max_files} files for testing (discovered {original_count} total)")
+        
         pipeline_stats['num_files_discovered'] = len(file_list)
         pipeline_stats['discovery_time_sec'] = time.time() - discover_start
         
@@ -745,7 +756,15 @@ def main():
         # Step 5: Process each month (month-at-a-time)
         logger.info("Step 4: Processing files month-at-a-time...")
         
-        month_items = sorted(files_by_month.items())
+        # Sort months, putting None keys at the end
+        month_items = sorted(files_by_month.items(), key=lambda x: (x[0] is None, x[0]))
+        
+        # Log files with unrecognizable month patterns
+        if (None, None) in files_by_month:
+            logger.warning(f"Found {len(files_by_month[(None, None)])} files with unrecognizable month patterns:")
+            for f in files_by_month[(None, None)][:5]:  # Log first 5
+                logger.warning(f"  - {f}")
+        
         for month_key, month_files in tqdm(month_items, desc="Processing months"):
             if month_key == (None, None):
                 month_str = "unknown_month"

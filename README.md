@@ -39,7 +39,7 @@ This pipeline processes raw NYC TLC taxi trip data (Parquet format) into an anal
 ### Required Packages
 
 ```bash
-pip install pandas numpy pyarrow dask[dataframe] fsspec s3fs psutil
+pip install pandas numpy pyarrow dask[dataframe] fsspec s3fs psutil tqdm
 ```
 
 **Note:** Install all packages together to ensure compatibility. If running on AWS:
@@ -63,7 +63,7 @@ pip install pytest pytest-cov
 Process Parquet files in a local directory:
 
 ```bash
-python pivot_all_files.py \
+python3 pivot_all_files.py \
     --input-dir ./data/parquet_files \
     --output-dir ./output \
     --workers 4 \
@@ -82,11 +82,12 @@ This will:
 Process from S3 and write results back to S3:
 
 ```bash
-python pivot_all_files.py \
+python3 pivot_all_files.py \
     --input-dir s3://dsc291-ucsd/ \
     --output-dir ./output \
     --s3-output s3://s3://dsc291-ucsd//wide-table \
     --workers 8 \
+    --max-files 3 \
     --keep-intermediate
 ```
 
@@ -122,7 +123,7 @@ This will:
 ### Example with All Options
 
 ```bash
-python pivot_all_files.py \
+python3 pivot_all_files.py \
     --input-dir /mnt/data/taxi \
     --output-dir ./pipeline_output \
     --s3-output s3://s3://dsc291-ucsd/ \
@@ -309,7 +310,7 @@ Main pipeline orchestration.
 ### Run All Tests
 
 ```bash
-python -m pytest test_pivot_comprehensive.py -v
+python3 -m pytest test_pivot_comprehensive.py -v
 ```
 
 ### Test Coverage
@@ -331,7 +332,7 @@ python -m pytest test_pivot_comprehensive.py -v
 ### Run Specific Test Class
 
 ```bash
-python -m pytest test_pivot_comprehensive.py::TestColumnDetectionVariants -v
+python3 -m pytest test_pivot_comprehensive.py::TestColumnDetectionVariants -v
 ```
 
 ---
