@@ -403,6 +403,8 @@ def generate_report(
             total_input = stats.get('total_input_rows', 'N/A')
             total_output = stats.get('wide_table_rows', stats.get('total_output_rows', 'N/A'))
             total_discarded = stats.get('total_discarded_rows', 'N/A')
+            total_discarded_raw = stats.get('total_discarded_raw_rows', 'N/A')
+            total_discarded_pivot = stats.get('total_discarded_pivot_rows', 'N/A')
             total_mismatches = stats.get('total_month_mismatches', 'N/A')
             peak_memory = stats.get('peak_memory_mb', 'N/A')
             parse_fails = stats.get('total_parse_fail_rows', 0)
@@ -416,6 +418,8 @@ def generate_report(
                 f"  \\item Total input rows: {total_input}",
                 f"  \\item Total output rows: {total_output}",
                 f"  \\item Total discarded rows: {total_discarded}",
+                f"  \\item Discarded raw rows: {total_discarded_raw}",
+                f"  \\item Discarded pivot rows: {total_discarded_pivot}",
                 f"  \\item Month-mismatch rows: {total_mismatches}",
                 f"  \\item Parse failures (datetime): {parse_fails}",
                 f"  \\item Low-count rows removed: {low_count}",
@@ -439,7 +443,8 @@ def generate_report(
         print(f"Total runtime: {runtime_str}")
         print(f"Input rows: {stats.get('total_input_rows', 'N/A')}")
         print(f"Output rows: {stats.get('wide_table_rows', stats.get('total_output_rows', 'N/A'))}")
-        print(f"Discarded rows: {stats.get('total_discarded_rows', 'N/A')}")
+        print(f"Discarded raw rows: {stats.get('total_discarded_raw_rows', 'N/A')}")
+        print(f"Discarded pivot rows: {stats.get('total_discarded_pivot_rows', 'N/A')}")
         print(f"Month-mismatch rows: {stats.get('total_month_mismatches', 'N/A')}")
         print("="*60 + "\n")
         
@@ -620,6 +625,8 @@ def main():
             'total_input_rows': 0,
             'total_output_rows': 0,
             'total_discarded_rows': 0,
+            'total_discarded_raw_rows': 0,
+            'total_discarded_pivot_rows': 0,
             'total_month_mismatches': 0,
             'total_parse_fail_rows': 0,
             'total_removed_rows': 0,
@@ -759,6 +766,11 @@ def main():
         # Step 8: Generate report
         logger.info("\nStep 6: Generating pipeline report...")
         pipeline_stats['total_runtime_sec'] = time.time() - pipeline_start
+        pipeline_stats['total_discarded_raw_rows'] = (
+            pipeline_stats['total_month_mismatches']
+            + pipeline_stats['total_parse_fail_rows']
+        )
+        pipeline_stats['total_discarded_pivot_rows'] = pipeline_stats['total_removed_rows']
         pipeline_stats['total_discarded_rows'] = (
             pipeline_stats['total_removed_rows']
             + pipeline_stats['total_month_mismatches']
