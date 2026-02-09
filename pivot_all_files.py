@@ -365,7 +365,7 @@ def combine_into_wide_table(
             'output_rows': output_rows,
             'output_path': output_path,
             'num_intermediate_files': len(parquet_files),
-            'total_input_rows': total_input_rows,
+            'intermediate_total_rows': total_input_rows,
             'num_hour_columns': len(hour_cols),
             'output_columns': df_wide.columns.tolist(),
             'num_output_columns': len(df_wide.columns),
@@ -842,7 +842,8 @@ def main():
             (pipeline_stats['total_removed_rows'] / pivot_denom)
             if pivot_denom else None
         )
-        pipeline_stats['intermediate_total_rows'] = pipeline_stats['total_output_rows']
+        if pipeline_stats.get('intermediate_total_rows') is None:
+            pipeline_stats['intermediate_total_rows'] = pipeline_stats['total_output_rows']
         
         # Add memory info
         process = psutil.Process(os.getpid())
