@@ -21,6 +21,7 @@ import pandas as pd
 import dask.dataframe as dd
 import pyarrow.parquet as pq
 import pyarrow as pa
+from tqdm import tqdm
 
 import pivot_utils as pu
 import partition_optimization as popt
@@ -32,6 +33,10 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+
+def _process_single_file_star(args: Tuple[Any, ...]) -> Dict[str, Any]:
+    return process_single_file(*args)
 
 
 def process_single_file(
@@ -513,10 +518,19 @@ def process_month_files(
     # Process files in parallel
     if num_workers > 1:
         with Pool(num_workers) as pool:
-            results = pool.starmap(process_single_file, task_args)
+            results = list(
+                tqdm(
+                    pool.imap_unordered(_process_single_file_star, task_args),
+                    total=len(task_args),
+                    desc="Processing files",
+                )
+            )
     else:
         # Sequential processing
-        results = [process_single_file(*args) for args in task_args]
+        results = [
+            process_single_file(*args)
+            for args in tqdm(task_args, desc="Processing files")
+        ]
     
     # Aggregate results
     for result in results:
@@ -673,7 +687,8 @@ def main():
         # Step 5: Process each month (month-at-a-time)
         logger.info("Step 4: Processing files month-at-a-time...")
         
-        for month_key, month_files in sorted(files_by_month.items()):
+        month_items = sorted(files_by_month.items())
+        for month_key, month_files in tqdm(month_items, desc="Processing months"):
             if month_key == (None, None):
                 month_str = "unknown_month"
             else:
