@@ -705,6 +705,19 @@ def main():
         if args.s3_output and pu.is_s3_path(args.s3_output):
             # Output bucket is private; force authenticated access
             write_storage_options = {'anon': False}
+            access_key = os.getenv("AWS_ACCESS_KEY_ID")
+            secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+            session_token = os.getenv("AWS_SESSION_TOKEN")
+            region = os.getenv("AWS_DEFAULT_REGION", "us-west-2")
+            if access_key and secret_key:
+                write_storage_options.update(
+                    {
+                        "key": access_key,
+                        "secret": secret_key,
+                        "token": session_token,
+                        "client_kwargs": {"region_name": region},
+                    }
+                )
 
         # Optional: Parse/optimize partition size
         partition_size = None
