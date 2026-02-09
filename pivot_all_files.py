@@ -92,6 +92,18 @@ def _default_local_intermediate_dir() -> str:
     return str(base / f"taxi-pivot-intermediate-{int(time.time())}")
 
 
+def _default_performance_path() -> str:
+    """Default performance.md path in project root."""
+    return str(Path(__file__).resolve().parent / 'performance.md')
+
+
+def _format_pct(numerator: Optional[float], denominator: Optional[float]) -> str:
+    """Format a percentage or return N/A."""
+    if not denominator:
+        return "N/A"
+    return f"{(numerator / denominator) * 100:.2f}%"
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -456,12 +468,11 @@ def combine_into_wide_table(
             .size()
             .reset_index(name='row_count')
         )
-        row_breakdown = {
-            int(row['year']): {
-                str(row['taxi_type']): int(row['row_count'])
-            }
-            for _, row in breakdown_counts.iterrows()
-        }
+        row_breakdown: Dict[int, Dict[str, int]] = {}
+        for _, row in breakdown_counts.iterrows():
+            year = int(row['year'])
+            taxi = str(row['taxi_type'])
+            row_breakdown.setdefault(year, {})[taxi] = int(row['row_count'])
 
         stats = {
             'output_rows': output_rows,
@@ -627,6 +638,119 @@ def generate_report(
         
     except Exception as e:
         logger.error(f"Error generating report: {e}", exc_info=True)
+
+
+def generate_performance_md(
+    stats: Dict[str, Any],
+    output_file: str,
+    write_storage_options: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Generate performance.md summary with required metrics and breakdowns."""
+    logger.info(f"Generating performance summary to {output_file}")
+    try:
+        if not pu.is_s3_path(output_file):
+            Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+
+        total_runtime = stats.get('total_runtime_sec')
+        peak_memory = stats.get('peak_memory_mb')
+        total_input = stats.get('total_input_rows')
+        total_raw_after = stats.get('total_raw_rows_after_filters')
+        total_discarded_raw = stats.get('total_discarded_raw_rows')
+        total_discarded_pivot = stats.get('total_discarded_pivot_rows')
+        total_discarded = stats.get('total_discarded_rows')
+        intermediate_rows = stats.get('total_output_rows')
+        wide_rows = stats.get('wide_table_rows')
+
+        discarded_raw_pct = _format_pct(total_discarded_raw, total_input)
+        discarded_pivot_pct = _format_pct(total_discarded_pivot, (intermediate_rows or 0) + (total_discarded_pivot or 0))
+        discarded_total_pct = _format_pct(total_discarded, total_input)
+
+        row_breakdown = stats.get('row_breakdown_by_year_and_taxi_type', {})
+        mismatch_by_month = stats.get('month_mismatch_by_month', {})
+        files_with_mismatches_by_month = stats.get('files_with_month_mismatches_by_month', {})
+        output_columns = stats.get('output_columns', [])
+        num_output_columns = stats.get('num_output_columns', len(output_columns))
+
+        lines = [
+            "# Performance Summary",
+            "",
+            "## Runtime & Memory",
+            "",
+            "| Metric | Value |",
+            "| --- | --- |",
+            f"| Total runtime (sec) | {total_runtime} |",
+            f"| Peak memory (MB) | {peak_memory} |",
+            "",
+            "## Row Counts",
+            "",
+            "| Metric | Value |",
+            "| --- | --- |",
+            f"| Total input rows | {total_input} |",
+            f"| Raw rows after parse/month filters | {total_raw_after} |",
+            f"| Intermediate pivoted rows (sum) | {intermediate_rows} |",
+            f"| Final wide table rows | {wide_rows} |",
+            "",
+            "## Discarded Rows",
+            "",
+            "| Reason | Count | Percent of input |",
+            "| --- | --- | --- |",
+            f"| Parse failures | {stats.get('total_parse_fail_rows')} | { _format_pct(stats.get('total_parse_fail_rows'), total_input) } |",
+            f"| Month mismatch | {stats.get('total_month_mismatches')} | { _format_pct(stats.get('total_month_mismatches'), total_input) } |",
+            f"| Low-count cleanup (pivot stage) | {stats.get('total_removed_rows')} | {discarded_pivot_pct} |",
+            f"| Total discarded (raw stage) | {total_discarded_raw} | {discarded_raw_pct} |",
+            f"| Total discarded (overall) | {total_discarded} | {discarded_total_pct} |",
+            "",
+            "## Date Consistency Issues",
+            "",
+            f"- Total month-mismatch rows: {stats.get('total_month_mismatches')}",
+            f"- Files with mismatches: {stats.get('files_with_month_mismatches')}",
+            "",
+            "| Month | Mismatch Rows | Files Affected |",
+            "| --- | --- | --- |",
+        ]
+
+        if mismatch_by_month:
+            for month in sorted(mismatch_by_month.keys()):
+                lines.append(
+                    f"| {month} | {mismatch_by_month.get(month, 0)} | {files_with_mismatches_by_month.get(month, 0)} |"
+                )
+        else:
+            lines.append("| (none) | 0 | 0 |")
+
+        lines += [
+            "",
+            "## Row Breakdown by Year and Taxi Type",
+            "",
+            "| Year | Taxi Type | Rows |",
+            "| --- | --- | --- |",
+        ]
+
+        if row_breakdown:
+            for year in sorted(row_breakdown.keys()):
+                taxi_map = row_breakdown.get(year, {})
+                for taxi_type in sorted(taxi_map.keys()):
+                    lines.append(f"| {year} | {taxi_type} | {taxi_map[taxi_type]} |")
+        else:
+            lines.append("| (none) | (none) | 0 |")
+
+        lines += [
+            "",
+            "## Schema Summary",
+            "",
+            f"- Output columns: {num_output_columns}",
+            "",
+            "```",
+            ", ".join(output_columns) if output_columns else "(none)",
+            "```",
+            "",
+        ]
+
+        with _open_output_file(output_file, write_storage_options) as f:
+            f.write("\n".join(lines))
+
+        logger.info(f"Performance summary written to {output_file}")
+    except Exception as e:
+        logger.error(f"Error generating performance.md: {e}", exc_info=True)
 
 
 def group_files_by_month(file_list: List[str]) -> Dict[Tuple[int, int], List[str]]:
@@ -797,8 +921,8 @@ def main():
         )
     )
     parser.add_argument(
-        '--report-file', type=str, default='pipeline_report.tex',
-        help='Output file for pipeline report (.tex or .json)'
+        '--report-file', type=str, default='report.json',
+        help='Output file for pipeline report (.json or .tex)'
     )
     parser.add_argument(
         '--max-files', type=int, default=None,
@@ -1104,13 +1228,12 @@ def main():
         pipeline_stats['wall_clock_end'] = datetime.now().isoformat()
         
         report_file = args.report_file
-        if (
-            pu.is_s3_path(args.output_dir)
-            and not pu.is_s3_path(report_file)
-            and not os.path.isabs(report_file)
-        ):
+        if not pu.is_s3_path(report_file) and not os.path.isabs(report_file):
             report_file = _join_output_path(args.output_dir, report_file)
         generate_report(pipeline_stats, report_file, write_storage_options)
+
+        performance_file = _default_performance_path()
+        generate_performance_md(pipeline_stats, performance_file, write_storage_options)
         
         logger.info("\n" + "="*60)
         logger.info("PIPELINE COMPLETED SUCCESSFULLY")
