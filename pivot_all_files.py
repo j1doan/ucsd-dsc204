@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 from collections import defaultdict
 from multiprocessing import Pool
+from datetime import datetime
 import psutil
 
 import pandas as pd
@@ -27,6 +28,22 @@ import pivot_utils as pu
 import partition_optimization as popt
 
 logger = logging.getLogger(__name__)
+
+# Global peak memory tracker
+_peak_memory_mb = 0.0
+_process = psutil.Process(os.getpid())
+
+
+def get_current_memory_mb() -> float:
+    """Get current process memory usage in MB and update peak."""
+    global _peak_memory_mb
+    try:
+        current_mb = _process.memory_info().rss / (1024 * 1024)
+        _peak_memory_mb = max(_peak_memory_mb, current_mb)
+        return current_mb
+    except Exception:
+        return 0.0
+
 
 # Configure logging
 logging.basicConfig(
@@ -89,11 +106,23 @@ def process_single_file(
     
     result = {
         'file_path': file_path,
+        'filename': Path(file_path).name,
         'success': False,
         'error': None,
+        'status': 'pending',
+        'input_rows': 0,
+        'output_rows': 0,
+        'discarded_rows': {
+            'parse_failure': 0,
+            'month_mismatch': 0,
+            'low_count': 0,
+        },
+        'processing_time_sec': 0.0,
+        'memory_delta_mb': 0.0,
     }
     
     start_time = time.time()
+    start_memory_mb = get_current_memory_mb()
     
     try:
         logger.info(f"Processing file: {file_path}")
@@ -163,7 +192,7 @@ def process_single_file(
         if parse_fail_rows:
             logger.warning(f"Dropping {parse_fail_rows} rows with invalid datetime")
             df = df[df[datetime_col].notna()]
-        result['parse_fail_rows'] = parse_fail_rows
+        result['discarded_rows']['parse_failure'] = parse_fail_rows
         
         # Extract date for month-mismatch detection
         df['_row_date'] = df[datetime_col].dt.date
@@ -186,7 +215,7 @@ def process_single_file(
                 # Drop mismatched rows from further processing
                 df = df.drop(mismatches.index)
         
-        result['month_mismatch_rows'] = month_mismatch_count
+        result['discarded_rows']['month_mismatch'] = month_mismatch_count
         
         # Pivot the data
         logger.info("Pivoting data...")
@@ -203,11 +232,11 @@ def process_single_file(
         df_cleaned, cleanup_stats = pu.cleanup_low_count_rows(pivoted, min_rides=min_rides)
         
         result['output_rows'] = len(df_cleaned)
-        result['removed_rows'] = cleanup_stats['rows_removed']
+        result['discarded_rows']['low_count'] = cleanup_stats.get('rows_removed', 0)
         
         logger.info(
-            f"After cleanup: {cleanup_stats['rows_after']} rows "
-            f"(removed {cleanup_stats['rows_removed']})"
+            f"After cleanup: {len(df_cleaned)} rows "
+            f"(removed {cleanup_stats.get('rows_removed', 0)})"
         )
         
         # Generate output filename
@@ -223,13 +252,16 @@ def process_single_file(
         
         result['output_path'] = output_path
         result['success'] = True
+        result['status'] = 'success'
         
     except Exception as e:
         logger.error(f"Error processing {file_path}: {e}", exc_info=True)
         result['error'] = str(e)
+        result['status'] = 'error'
     
     finally:
         result['processing_time_sec'] = time.time() - start_time
+        result['memory_delta_mb'] = get_current_memory_mb() - start_memory_mb
     
     return result
 
@@ -267,6 +299,9 @@ def combine_into_wide_table(
         - 'num_hour_columns': Number of hour columns (should be 24)
         - 'output_columns': List of output column names
     """
+    
+    start_time = time.time()
+    start_memory_mb = get_current_memory_mb()
     
     logger.info(f"Combining intermediate files from {intermediate_dir}")
     
@@ -378,7 +413,11 @@ def combine_into_wide_table(
         
     except Exception as e:
         logger.error(f"Error combining intermediate files: {e}", exc_info=True)
-        return 0, {'error': str(e)}
+        return 0, {
+            'error': str(e),
+            'processing_time_sec': time.time() - start_time,
+            'memory_delta_mb': get_current_memory_mb() - start_memory_mb,
+        }
 
 
 def generate_report(
@@ -414,8 +453,36 @@ def generate_report(
         }
         
         if output_file.lower().endswith('.json'):
+            # Compile comprehensive JSON report
+            report = {
+                'timestamp': datetime.now().isoformat(),
+                'summary': {
+                    'total_runtime_seconds': stats.get('total_runtime_sec', 0),
+                    'input_rows_total': stats.get('total_input_rows', 0),
+                    'output_rows_total': stats.get('wide_table_rows', stats.get('total_output_rows', 0)),
+                    'discarded_rows_total': stats.get('total_discarded_rows', 0),
+                },
+                'memory': {
+                    'peak_rss_mb': _peak_memory_mb,
+                    'peak_rss_gb': round(_peak_memory_mb / 1024, 2),
+                },
+                'discards': {
+                    'low_count_cleanup': stats.get('total_removed_rows', 0),
+                    'parse_failures': stats.get('total_parse_fail_rows', 0),
+                    'month_mismatch': stats.get('total_month_mismatches', 0),
+                },
+                'phase_stats': stats.get('phase_stats', {}),
+                'per_file_stats': [],
+                'full_stats': stats,
+            }
+            
+            # Extract per-file stats
+            for month_key, month_data in stats.get('month_stats', {}).items():
+                for file_result in month_data.get('file_results', []):
+                    report['per_file_stats'].append(file_result)
+            
             with open(output_file, 'w') as f:
-                json.dump(stats, f, indent=2, default=str)
+                json.dump(report, f, indent=2, default=str)
         else:
             total_runtime = stats.get('total_runtime_sec', 'N/A')
             total_input = stats.get('total_input_rows', 'N/A')
@@ -463,18 +530,21 @@ def generate_report(
         print("\n" + "="*60)
         print("PIPELINE SUMMARY REPORT")
         print("="*60)
+        print(f"Timestamp: {datetime.now().isoformat()}")
         total_runtime = stats.get('total_runtime_sec', None)
         if isinstance(total_runtime, (int, float)):
             runtime_str = f"{total_runtime:.2f}s"
         else:
             runtime_str = "N/A"
         print(f"Total runtime: {runtime_str}")
-        print(f"Input rows: {stats.get('total_input_rows', 'N/A')}")
-        print(f"Output rows: {stats.get('wide_table_rows', stats.get('total_output_rows', 'N/A'))}")
-        print(f"Discarded raw rows: {stats.get('total_discarded_raw_rows', 'N/A')}")
-        print(f"Discarded pivot rows: {stats.get('total_discarded_pivot_rows', 'N/A')}")
-        print(f"Month-mismatch rows: {stats.get('total_month_mismatches', 'N/A')}")
-        print(f"Files with date mismatches: {stats.get('files_with_month_mismatches', 'N/A')}")
+        print(f"Input rows: {stats.get('total_input_rows', 'N/A'):,}")
+        print(f"Output rows: {stats.get('wide_table_rows', stats.get('total_output_rows', 'N/A')):,}")
+        print(f"Discarded rows: {stats.get('total_discarded_rows', 'N/A'):,}")
+        print(f"  - Low-count cleanup: {stats.get('total_removed_rows', 0):,}")
+        print(f"  - Parse failures: {stats.get('total_parse_fail_rows', 0):,}")
+        print(f"  - Month-mismatch: {stats.get('total_month_mismatches', 0):,}")
+        print(f"\nMemory:")
+        print(f"  - Peak RSS: {_peak_memory_mb:.2f} MB ({_peak_memory_mb/1024:.2f} GB)")
         print("="*60 + "\n")
         
     except Exception as e:
@@ -649,6 +719,7 @@ def main():
     args = parser.parse_args()
     
     pipeline_start = time.time()
+    wall_clock_start = datetime.now().isoformat()
     
     try:
         # Initialize stats
@@ -670,10 +741,14 @@ def main():
             'num_files_processed': 0,
             'num_errors': 0,
             'month_stats': {},
+            'phase_stats': {},
+            'wall_clock_start': wall_clock_start,
         }
         
         # Step 1: Discover files
         logger.info("Step 1: Discovering parquet files...")
+        phase1_start = time.time()
+        phase1_mem_start = get_current_memory_mb()
         discover_start = time.time()
         file_list = pu.discover_parquet_files(args.input_dir)
         
@@ -691,9 +766,12 @@ def main():
         
         pipeline_stats['num_files_discovered'] = len(file_list)
         pipeline_stats['discovery_time_sec'] = time.time() - discover_start
-        
-        # Step 2: Check schema consistency
+        phase1_time = time.time() - phase1_start
+        phase1_mem = get_current_memory_mb() - phase1_mem_start
+        pipeline_stats['phase_stats']['discovery'] = {'time': phase1_time, 'memory_mb': phase1_mem}
         logger.info("Step 2: Checking schema consistency...")
+        phase2_start = time.time()
+        phase2_mem_start = get_current_memory_mb()
         common_schema: Optional[Dict[str, str]] = None
         try:
             common_schema = pu.get_common_schema(file_list)
@@ -701,6 +779,9 @@ def main():
             pipeline_stats['common_schema'] = common_schema
         except Exception as e:
             logger.warning(f"Could not detect common schema: {e}")
+        phase2_time = time.time() - phase2_start
+        phase2_mem = get_current_memory_mb() - phase2_mem_start
+        pipeline_stats['phase_stats']['validation'] = {'time': phase2_time, 'memory_mb': phase2_mem}
         
         # Step 3: Group files by month
         logger.info("Step 3: Grouping files by month...")
@@ -755,6 +836,8 @@ def main():
         
         # Step 5: Process each month (month-at-a-time)
         logger.info("Step 4: Processing files month-at-a-time...")
+        phase4_start = time.time()
+        phase4_mem_start = get_current_memory_mb()
         
         # Sort months, putting None keys at the end
         month_items = sorted(files_by_month.items(), key=lambda x: (x[0] is None, x[0]))
@@ -802,6 +885,10 @@ def main():
                     f"rows had date mismatches"
                 )
         
+        phase4_time = time.time() - phase4_start
+        phase4_mem = get_current_memory_mb() - phase4_mem_start
+        pipeline_stats['phase_stats']['processing'] = {'time': phase4_time, 'memory_mb': phase4_mem}
+        
         # Month mismatch breakdown
         pipeline_stats['month_mismatch_by_month'] = {
             month: stats.get('total_month_mismatches', 0)
@@ -814,6 +901,8 @@ def main():
         
         # Step 6: Combine into wide table
         logger.info("\nStep 5: Combining intermediate files into single wide table...")
+        phase5_start = time.time()
+        phase5_mem_start = get_current_memory_mb()
         combine_start = time.time()
         
         # Determine output path for wide table
@@ -832,6 +921,9 @@ def main():
         pipeline_stats['wide_table_rows'] = wide_rows
         pipeline_stats['wide_table_path'] = final_output_path
         pipeline_stats['combine_time_sec'] = time.time() - combine_start
+        phase5_time = time.time() - phase5_start
+        phase5_mem = get_current_memory_mb() - phase5_mem_start
+        pipeline_stats['phase_stats']['combine'] = {'time': phase5_time, 'memory_mb': phase5_mem}
         pipeline_stats.update(combine_stats)
         
         # Step 7: Cleanup intermediates if not keeping
@@ -865,8 +957,8 @@ def main():
             pipeline_stats['intermediate_total_rows'] = pipeline_stats['total_output_rows']
         
         # Add memory info
-        process = psutil.Process(os.getpid())
-        pipeline_stats['peak_memory_mb'] = process.memory_info().rss / (1024**2)
+        pipeline_stats['peak_memory_mb'] = _peak_memory_mb
+        pipeline_stats['wall_clock_end'] = datetime.now().isoformat()
         
         generate_report(pipeline_stats, args.report_file)
         
