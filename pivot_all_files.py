@@ -237,7 +237,8 @@ def process_single_file(
 def combine_into_wide_table(
     intermediate_dir: str,
     output_path: str,
-    storage_options: Optional[Dict[str, Any]] = None,
+    read_storage_options: Optional[Dict[str, Any]] = None,
+    write_storage_options: Optional[Dict[str, Any]] = None,
 ) -> Tuple[int, Dict[str, Any]]:
     """
     Combine all intermediate pivoted tables into a single wide table.
@@ -296,8 +297,8 @@ def combine_into_wide_table(
         
         for pf in parquet_files:
             logger.info(f"Reading intermediate file: {pf}")
-            if storage_options and pu.is_s3_path(pf):
-                ddf = dd.read_parquet(str(pf), storage_options=storage_options)
+            if read_storage_options and pu.is_s3_path(pf):
+                ddf = dd.read_parquet(str(pf), storage_options=read_storage_options)
             else:
                 ddf = dd.read_parquet(str(pf))
             
@@ -341,8 +342,8 @@ def combine_into_wide_table(
         # Write to parquet
         logger.info(f"Writing wide table to {output_path}")
         write_kwargs: Dict[str, Any] = {'engine': 'pyarrow'}
-        if storage_options and pu.is_s3_path(output_path):
-            write_kwargs['storage_options'] = storage_options
+        if write_storage_options and pu.is_s3_path(output_path):
+            write_kwargs['storage_options'] = write_storage_options
         df_wide.to_parquet(output_path, **write_kwargs)
         
         # Row breakdown by year and taxi type
@@ -696,9 +697,14 @@ def main():
         logger.info(f"Grouped into {len(files_by_month)} months")
         
         # Determine storage options for S3 (if needed)
-        storage_options: Optional[Dict[str, Any]] = None
-        if pu.is_s3_path(args.input_dir) or (args.s3_output and pu.is_s3_path(args.s3_output)):
-            storage_options = pu.get_storage_options(args.input_dir if pu.is_s3_path(args.input_dir) else args.s3_output)
+        read_storage_options: Optional[Dict[str, Any]] = None
+        write_storage_options: Optional[Dict[str, Any]] = None
+        if pu.is_s3_path(args.input_dir):
+            # Input bucket may be public; use default (anon=True)
+            read_storage_options = pu.get_storage_options(args.input_dir)
+        if args.s3_output and pu.is_s3_path(args.s3_output):
+            # Output bucket is private; force authenticated access
+            write_storage_options = {'anon': False}
 
         # Optional: Parse/optimize partition size
         partition_size = None
@@ -743,7 +749,7 @@ def main():
                 partition_size=partition_size,
                 num_workers=args.workers,
                 common_schema=common_schema,
-                storage_options=storage_options,
+                storage_options=read_storage_options,
             )
             month_result['processing_time_sec'] = time.time() - month_process_start
             
@@ -787,7 +793,8 @@ def main():
         wide_rows, combine_stats = combine_into_wide_table(
             str(intermediate_dir),
             final_output_path,
-            storage_options=storage_options,
+            read_storage_options=read_storage_options,
+            write_storage_options=write_storage_options,
         )
         
         pipeline_stats['wide_table_rows'] = wide_rows
