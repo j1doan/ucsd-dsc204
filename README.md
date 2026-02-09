@@ -2,7 +2,7 @@
 
 A production-grade pipeline for processing NYC TLC taxi trip Parquet data into aggregated time-series tables.
 
-**Assignment:** DSC 204 Homework 1 (100 points)  
+**Assignment:** DSC 291 Homework 1 (100 points)  
 **Status:** Complete with Parts 1–5 implemented and tested
 
 ---
@@ -83,9 +83,9 @@ Process from S3 and write results back to S3:
 
 ```bash
 python pivot_all_files.py \
-    --input-dir s3://my-bucket/nyc-taxi-data \
+    --input-dir s3://dsc291-ucsd/ \
     --output-dir ./output \
-    --s3-output s3://my-bucket/taxi-results/wide-table \
+    --s3-output s3://s3://dsc291-ucsd//wide-table \
     --workers 8 \
     --keep-intermediate
 ```
@@ -93,7 +93,7 @@ python pivot_all_files.py \
 This will:
 1. Discover `.parquet` files from S3
 2. Process locally (writes intermediates to `./output/intermediate/`)
-3. Upload final wide table to `s3://my-bucket/taxi-results/wide-table/`
+3. Upload final wide table to `s3://dsc291-ucsd//wide-table/`
 4. Optionally keep intermediate files for debugging
 
 ---
@@ -125,7 +125,7 @@ This will:
 python pivot_all_files.py \
     --input-dir /mnt/data/taxi \
     --output-dir ./pipeline_output \
-    --s3-output s3://my-analytics/taxi-pivot-table \
+    --s3-output s3://s3://dsc291-ucsd/ \
     --min-rides 50 \
     --workers 8 \
     --partition-size "500MB" \
@@ -210,7 +210,7 @@ If `--s3-output` is specified, the final wide table is uploaded to the given S3 
 
 **S3 Path Format:**
 ```
-s3://your-bucket/path/to/wide-table/
+s3://dsc291-ucsd/wide-table/
 ```
 
 **Content:**
@@ -219,7 +219,7 @@ s3://your-bucket/path/to/wide-table/
 
 **Example S3 Output:**
 ```
-s3://my-analytics-bucket/taxi-pipeline/wide_table/
+s3://dsc291-ucsd/wide_table/
 ├── part-0.parquet
 ├── _metadata
 └── _common_metadata
@@ -232,7 +232,7 @@ import s3fs
 
 # With anonymous access
 fs = s3fs.S3FileSystem(anon=True)
-df = pd.read_parquet('s3://my-bucket/path/wide_table/', filesystem=fs)
+df = pd.read_parquet('s3://dsc291-ucsd/wide_table/', filesystem=fs)
 ```
 
 **Note:** If your S3 bucket requires authentication, set AWS credentials in environment variables or configure `.aws/credentials`:
@@ -361,7 +361,7 @@ Ensure all packages are installed in your current Python environment.
   export AWS_DEFAULT_REGION=us-east-1
   ```
 - Or configure `~/.aws/credentials`
-- Then run pipeline with `--s3-output s3://your-bucket/path/`
+- Then run pipeline with `--s3-output s3://dsc291-ucsd/`
 
 ### 3. **MemoryError or Out of Memory**
 
@@ -381,7 +381,7 @@ Ensure all packages are installed in your current Python environment.
 ls -la /path/to/input/dir/
 
 # List S3 files
-aws s3 ls s3://bucket/path/ --recursive | grep parquet
+aws s3 ls s3://dsc291-ucsd/ --recursive | grep parquet
 ```
 
 **Ensure:**
@@ -475,7 +475,6 @@ DSC 204/
 
 ## License & Attribution
 
-**Course:** Data Science / Big Data Analytics (DSC 204)  
-**Semester:** Spring 2024  
+**Course:** DSC 291: Big Data Analytics (WI26)
+**Instructor:** UC San Diego
 **Assignment:** Homework 1 – Taxi Data Pivoting  
-**Instructor:** Course Staff  
