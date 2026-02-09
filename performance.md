@@ -5,7 +5,7 @@
 | Metric | Value |
 | --- | --- |
 | Total runtime (sec) | 3776.3389794826508 |
-| Peak memory (MB) | 182.53125 |
+| Peak memory (MB) | 18253.125 |
 
 ## Row Counts
 
@@ -14,7 +14,6 @@
 | Total input rows | 3239156523 |
 | Raw rows after parse/month filters | 3239139459 |
 | Intermediate pivoted rows (sum) | 1443361 |
-| Final wide table rows | 0 |
 
 ## Discarded Rows
 
@@ -217,10 +216,5 @@
 | --- | --- | --- |
 | (none) | (none) | 0 |
 
-## Schema Summary
 
-- Output columns: 0
 
-```
-(none)
-```
