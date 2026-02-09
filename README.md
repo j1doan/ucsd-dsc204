@@ -66,7 +66,7 @@ Process Parquet files in a local directory:
 python3 pivot_all_files.py \
     --input-dir ./data/parquet_files \
     --output-dir ./output \
-    --workers 4 \
+    --workers 48 \
     --min-rides 50
 ```
 
@@ -83,12 +83,14 @@ Process from S3 and write results back to S3:
 
 ```bash
 python3 pivot_all_files.py \
-    --input-dir s3://dsc291-ucsd/ \
-    --output-dir ./output \
-    --s3-output s3://s3://dsc291-ucsd//wide-table \
-    --workers 8 \
-    --max-files 3 \
-    --keep-intermediate
+  --input-dir s3://dsc291-ucsd/taxi/Dataset \
+  --output-dir ./output-full \
+  --s3-output s3://dsc291-pprashant-results/taxi-wide/full \
+  --intermediate-dir s3://dsc291-pprashant-results/taxi-intermediate/full \
+  --workers 48 \
+  --partition-size "500MB" \
+  --report-file report.json \
+  --keep-intermediate
 ```
 
 This will:
