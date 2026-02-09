@@ -345,6 +345,21 @@ def combine_into_wide_table(
             write_kwargs['storage_options'] = storage_options
         df_wide.to_parquet(output_path, **write_kwargs)
         
+        # Row breakdown by year and taxi type
+        df_breakdown = df_wide.reset_index()
+        df_breakdown['year'] = pd.to_datetime(df_breakdown['date']).dt.year
+        breakdown_counts = (
+            df_breakdown.groupby(['year', 'taxi_type'])
+            .size()
+            .reset_index(name='row_count')
+        )
+        row_breakdown = {
+            int(row['year']): {
+                str(row['taxi_type']): int(row['row_count'])
+            }
+            for _, row in breakdown_counts.iterrows()
+        }
+
         stats = {
             'output_rows': output_rows,
             'output_path': output_path,
@@ -352,6 +367,8 @@ def combine_into_wide_table(
             'total_input_rows': total_input_rows,
             'num_hour_columns': len(hour_cols),
             'output_columns': df_wide.columns.tolist(),
+            'num_output_columns': len(df_wide.columns),
+            'row_breakdown_by_year_and_taxi_type': row_breakdown,
         }
         
         logger.info(f"Successfully created wide table: {output_rows} rows")
@@ -405,10 +422,15 @@ def generate_report(
             total_discarded = stats.get('total_discarded_rows', 'N/A')
             total_discarded_raw = stats.get('total_discarded_raw_rows', 'N/A')
             total_discarded_pivot = stats.get('total_discarded_pivot_rows', 'N/A')
+            discarded_raw_pct = stats.get('discarded_raw_pct', 'N/A')
+            discarded_pivot_pct = stats.get('discarded_pivot_pct', 'N/A')
             total_mismatches = stats.get('total_month_mismatches', 'N/A')
+            mismatch_files = stats.get('files_with_month_mismatches', 'N/A')
             peak_memory = stats.get('peak_memory_mb', 'N/A')
             parse_fails = stats.get('total_parse_fail_rows', 0)
             low_count = stats.get('total_removed_rows', 0)
+            intermediate_rows = stats.get('intermediate_total_rows', 'N/A')
+            num_output_columns = stats.get('num_output_columns', 'N/A')
             
             tex_lines = [
                 r"\section*{Pipeline Report}",
@@ -419,10 +441,15 @@ def generate_report(
                 f"  \\item Total output rows: {total_output}",
                 f"  \\item Total discarded rows: {total_discarded}",
                 f"  \\item Discarded raw rows: {total_discarded_raw}",
+                f"  \\item Discarded raw pct: {discarded_raw_pct}",
                 f"  \\item Discarded pivot rows: {total_discarded_pivot}",
+                f"  \\item Discarded pivot pct: {discarded_pivot_pct}",
                 f"  \\item Month-mismatch rows: {total_mismatches}",
+                f"  \\item Files with date mismatches: {mismatch_files}",
                 f"  \\item Parse failures (datetime): {parse_fails}",
                 f"  \\item Low-count rows removed: {low_count}",
+                f"  \\item Intermediate rows: {intermediate_rows}",
+                f"  \\item Output columns: {num_output_columns}",
                 r"\end{itemize}",
             ]
             
@@ -446,6 +473,7 @@ def generate_report(
         print(f"Discarded raw rows: {stats.get('total_discarded_raw_rows', 'N/A')}")
         print(f"Discarded pivot rows: {stats.get('total_discarded_pivot_rows', 'N/A')}")
         print(f"Month-mismatch rows: {stats.get('total_month_mismatches', 'N/A')}")
+        print(f"Files with date mismatches: {stats.get('files_with_month_mismatches', 'N/A')}")
         print("="*60 + "\n")
         
     except Exception as e:
@@ -510,6 +538,7 @@ def process_month_files(
         'total_removed_rows': 0,
         'total_month_mismatches': 0,
         'total_parse_fail_rows': 0,
+        'files_with_month_mismatches': 0,
         'file_results': [],
         'errors': 0,
     }
@@ -547,6 +576,8 @@ def process_month_files(
             month_stats['total_removed_rows'] += result.get('removed_rows', 0)
             month_stats['total_month_mismatches'] += result.get('month_mismatch_rows', 0)
             month_stats['total_parse_fail_rows'] += result.get('parse_fail_rows', 0)
+            if result.get('month_mismatch_rows', 0) > 0:
+                month_stats['files_with_month_mismatches'] += 1
         else:
             month_stats['errors'] += 1
             logger.error(f"Failed to process {result['file_path']}: {result['error']}")
@@ -630,6 +661,7 @@ def main():
             'total_month_mismatches': 0,
             'total_parse_fail_rows': 0,
             'total_removed_rows': 0,
+            'files_with_month_mismatches': 0,
             'num_files_processed': 0,
             'num_errors': 0,
             'month_stats': {},
@@ -721,6 +753,7 @@ def main():
             pipeline_stats['total_removed_rows'] += month_result['total_removed_rows']
             pipeline_stats['total_month_mismatches'] += month_result['total_month_mismatches']
             pipeline_stats['total_parse_fail_rows'] += month_result['total_parse_fail_rows']
+            pipeline_stats['files_with_month_mismatches'] += month_result.get('files_with_month_mismatches', 0)
             pipeline_stats['num_files_processed'] += len(month_files)
             pipeline_stats['num_errors'] += month_result['errors']
             
@@ -734,6 +767,10 @@ def main():
         # Month mismatch breakdown
         pipeline_stats['month_mismatch_by_month'] = {
             month: stats.get('total_month_mismatches', 0)
+            for month, stats in pipeline_stats['month_stats'].items()
+        }
+        pipeline_stats['files_with_month_mismatches_by_month'] = {
+            month: stats.get('files_with_month_mismatches', 0)
             for month, stats in pipeline_stats['month_stats'].items()
         }
         
@@ -776,6 +813,16 @@ def main():
             + pipeline_stats['total_month_mismatches']
             + pipeline_stats['total_parse_fail_rows']
         )
+        pipeline_stats['discarded_raw_pct'] = (
+            (pipeline_stats['total_discarded_raw_rows'] / pipeline_stats['total_input_rows'])
+            if pipeline_stats['total_input_rows'] else None
+        )
+        pivot_denom = pipeline_stats['total_output_rows'] + pipeline_stats['total_removed_rows']
+        pipeline_stats['discarded_pivot_pct'] = (
+            (pipeline_stats['total_removed_rows'] / pivot_denom)
+            if pivot_denom else None
+        )
+        pipeline_stats['intermediate_total_rows'] = pipeline_stats['total_output_rows']
         
         # Add memory info
         process = psutil.Process(os.getpid())
