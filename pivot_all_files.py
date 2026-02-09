@@ -387,7 +387,10 @@ def combine_into_wide_table(
     if intermediate_files:
         parquet_files = sorted(intermediate_files)
     elif pu.is_s3_path(intermediate_dir):
-        fs = pu.get_filesystem(intermediate_dir)
+        if read_storage_options and HAS_FSSPEC:
+            fs = fsspec.filesystem('s3', **read_storage_options)
+        else:
+            fs = pu.get_filesystem(intermediate_dir)
         pattern = intermediate_dir.rstrip('/') + '/*_pivoted.parquet'
         parquet_files = [
             f's3://{f}' if not f.startswith('s3://') else f
@@ -1175,11 +1178,15 @@ def main():
         else:
             final_output_path = _join_output_path(args.output_dir, 'final_wide_table.parquet')
         
+        combine_read_options = read_storage_options
+        if pu.is_s3_path(str(intermediate_dir)) and write_storage_options:
+            combine_read_options = write_storage_options
+
         wide_rows, combine_stats = combine_into_wide_table(
             str(intermediate_dir),
             final_output_path,
             intermediate_files=intermediate_files,
-            read_storage_options=read_storage_options,
+            read_storage_options=combine_read_options,
             write_storage_options=write_storage_options,
         )
         

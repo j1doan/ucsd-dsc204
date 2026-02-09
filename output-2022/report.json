@@ -1,0 +1,2533 @@
+{
+  "timestamp": "2026-02-09T20:59:54.202470",
+  "summary": {
+    "total_runtime_seconds": 315.2443280220032,
+    "input_rows_total_raw": 267424247,
+    "raw_rows_after_filters": 267422585,
+    "intermediate_rows_total": 144718,
+    "output_rows_total_wide": 121480,
+    "discarded_rows_raw_total": 1662,
+    "discarded_rows_pivot_total": 169778,
+    "discarded_rows_total": 1662
+  },
+  "memory": {
+    "peak_rss_mb": 475.06640625,
+    "peak_rss_gb": 0.46
+  },
+  "discards": {
+    "low_count_cleanup": 169778,
+    "parse_failures": 0,
+    "month_mismatch": 1662
+  },
+  "phase_stats": {
+    "discovery": {
+      "time": 0.10078954696655273,
+      "memory_mb": 17.44140625
+    },
+    "validation": {
+      "time": 6.097257852554321,
+      "memory_mb": 13.515625
+    },
+    "processing": {
+      "time": 307.06257462501526,
+      "memory_mb": 0.765625
+    },
+    "combine": {
+      "time": 1.9816346168518066,
+      "memory_mb": 297.0703125
+    }
+  },
+  "per_file_stats": [
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-01.parquet",
+      "filename": "green_tripdata_2022-01.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 62495,
+      "output_rows": 306,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 4,
+        "low_count": 3713
+      },
+      "raw_rows_after_filters": 62491,
+      "processing_time_sec": 0.4975407123565674,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        1
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-01_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-01.parquet",
+      "filename": "fhv_tripdata_2022-01.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1143691,
+      "output_rows": 1610,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 6052
+      },
+      "raw_rows_after_filters": 1143691,
+      "processing_time_sec": 1.2775299549102783,
+      "memory_delta_mb": 0.00390625,
+      "expected_month": [
+        2022,
+        1
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-01_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-01.parquet",
+      "filename": "yellow_tripdata_2022-01.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 2463931,
+      "output_rows": 2067,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 52,
+        "low_count": 4441
+      },
+      "raw_rows_after_filters": 2463879,
+      "processing_time_sec": 3.2372889518737793,
+      "memory_delta_mb": 0.00390625,
+      "expected_month": [
+        2022,
+        1
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-01_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-01.parquet",
+      "filename": "fhvhv_tripdata_2022-01.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 14751591,
+      "output_rows": 7634,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 363
+      },
+      "raw_rows_after_filters": 14751591,
+      "processing_time_sec": 20.893373012542725,
+      "memory_delta_mb": 0.16015625,
+      "expected_month": [
+        2022,
+        1
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-01_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-02.parquet",
+      "filename": "green_tripdata_2022-02.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 69399,
+      "output_rows": 327,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 23,
+        "low_count": 3452
+      },
+      "raw_rows_after_filters": 69376,
+      "processing_time_sec": 0.5198488235473633,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        2
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-02_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-02.parquet",
+      "filename": "fhv_tripdata_2022-02.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1251504,
+      "output_rows": 1900,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5091
+      },
+      "raw_rows_after_filters": 1251504,
+      "processing_time_sec": 1.3365495204925537,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        2
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-02_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-02.parquet",
+      "filename": "yellow_tripdata_2022-02.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 2979431,
+      "output_rows": 1980,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 64,
+        "low_count": 4111
+      },
+      "raw_rows_after_filters": 2979367,
+      "processing_time_sec": 3.9773597717285156,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        2
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-02_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-02.parquet",
+      "filename": "fhvhv_tripdata_2022-02.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 16019283,
+      "output_rows": 6913,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 322
+      },
+      "raw_rows_after_filters": 16019283,
+      "processing_time_sec": 23.142824411392212,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        2
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-02_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-03.parquet",
+      "filename": "green_tripdata_2022-03.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 78537,
+      "output_rows": 372,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 24,
+        "low_count": 3862
+      },
+      "raw_rows_after_filters": 78513,
+      "processing_time_sec": 0.5451445579528809,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        3
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-03_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-03.parquet",
+      "filename": "fhv_tripdata_2022-03.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1380816,
+      "output_rows": 2087,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5638
+      },
+      "raw_rows_after_filters": 1380816,
+      "processing_time_sec": 1.5020949840545654,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        3
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-03_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-03.parquet",
+      "filename": "yellow_tripdata_2022-03.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3627882,
+      "output_rows": 2240,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 89,
+        "low_count": 4497
+      },
+      "raw_rows_after_filters": 3627793,
+      "processing_time_sec": 4.69141411781311,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        3
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-03_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-03.parquet",
+      "filename": "fhvhv_tripdata_2022-03.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 18453548,
+      "output_rows": 7669,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 347
+      },
+      "raw_rows_after_filters": 18453548,
+      "processing_time_sec": 24.92646026611328,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        3
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-03_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-04.parquet",
+      "filename": "green_tripdata_2022-04.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 76136,
+      "output_rows": 354,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 35,
+        "low_count": 3716
+      },
+      "raw_rows_after_filters": 76101,
+      "processing_time_sec": 0.5388169288635254,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        4
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-04_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-04.parquet",
+      "filename": "fhv_tripdata_2022-04.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1246669,
+      "output_rows": 2266,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5232
+      },
+      "raw_rows_after_filters": 1246669,
+      "processing_time_sec": 1.3901746273040771,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        4
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-04_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-04.parquet",
+      "filename": "yellow_tripdata_2022-04.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3599920,
+      "output_rows": 2226,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 158,
+        "low_count": 4307
+      },
+      "raw_rows_after_filters": 3599762,
+      "processing_time_sec": 4.375080108642578,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        4
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-04_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-04.parquet",
+      "filename": "fhvhv_tripdata_2022-04.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 17752561,
+      "output_rows": 7468,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 307
+      },
+      "raw_rows_after_filters": 17752561,
+      "processing_time_sec": 25.447453498840332,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        4
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-04_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-05.parquet",
+      "filename": "green_tripdata_2022-05.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 76891,
+      "output_rows": 362,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 17,
+        "low_count": 4010
+      },
+      "raw_rows_after_filters": 76874,
+      "processing_time_sec": 0.5446629524230957,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        5
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-05_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-05.parquet",
+      "filename": "fhv_tripdata_2022-05.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1255828,
+      "output_rows": 2301,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5479
+      },
+      "raw_rows_after_filters": 1255828,
+      "processing_time_sec": 1.3791587352752686,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        5
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-05_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-05.parquet",
+      "filename": "yellow_tripdata_2022-05.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3588295,
+      "output_rows": 2307,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 143,
+        "low_count": 4473
+      },
+      "raw_rows_after_filters": 3588152,
+      "processing_time_sec": 4.198506832122803,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        5
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-05_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-05.parquet",
+      "filename": "fhvhv_tripdata_2022-05.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 18157335,
+      "output_rows": 7741,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 292
+      },
+      "raw_rows_after_filters": 18157335,
+      "processing_time_sec": 27.210345029830933,
+      "memory_delta_mb": 0.0078125,
+      "expected_month": [
+        2022,
+        5
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-05_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-06.parquet",
+      "filename": "green_tripdata_2022-06.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 73718,
+      "output_rows": 351,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 9,
+        "low_count": 3942
+      },
+      "raw_rows_after_filters": 73709,
+      "processing_time_sec": 0.5500714778900146,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        6
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-06_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-06.parquet",
+      "filename": "fhv_tripdata_2022-06.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1195414,
+      "output_rows": 2414,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5124
+      },
+      "raw_rows_after_filters": 1195414,
+      "processing_time_sec": 1.3905563354492188,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        6
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-06_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-06.parquet",
+      "filename": "yellow_tripdata_2022-06.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3558124,
+      "output_rows": 2245,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 512,
+        "low_count": 4413
+      },
+      "raw_rows_after_filters": 3557612,
+      "processing_time_sec": 4.304811716079712,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        6
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-06_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-06.parquet",
+      "filename": "fhvhv_tripdata_2022-06.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 17780075,
+      "output_rows": 7500,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 263
+      },
+      "raw_rows_after_filters": 17780075,
+      "processing_time_sec": 26.20162343978882,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        6
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-06_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-07.parquet",
+      "filename": "green_tripdata_2022-07.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 64192,
+      "output_rows": 332,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 4,
+        "low_count": 3941
+      },
+      "raw_rows_after_filters": 64188,
+      "processing_time_sec": 0.5477309226989746,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        7
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-07_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-07.parquet",
+      "filename": "fhv_tripdata_2022-07.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1159579,
+      "output_rows": 2062,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5730
+      },
+      "raw_rows_after_filters": 1159579,
+      "processing_time_sec": 1.3476588726043701,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        7
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-07_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-07.parquet",
+      "filename": "yellow_tripdata_2022-07.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3174394,
+      "output_rows": 2253,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 82,
+        "low_count": 4586
+      },
+      "raw_rows_after_filters": 3174312,
+      "processing_time_sec": 4.063944101333618,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        7
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-07_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-07.parquet",
+      "filename": "fhvhv_tripdata_2022-07.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 17464619,
+      "output_rows": 7760,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 261
+      },
+      "raw_rows_after_filters": 17464619,
+      "processing_time_sec": 23.269861936569214,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        7
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-07_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-08.parquet",
+      "filename": "green_tripdata_2022-08.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 65929,
+      "output_rows": 336,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 14,
+        "low_count": 3886
+      },
+      "raw_rows_after_filters": 65915,
+      "processing_time_sec": 0.6015670299530029,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        8
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-08_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-08.parquet",
+      "filename": "fhv_tripdata_2022-08.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1151155,
+      "output_rows": 1925,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5874
+      },
+      "raw_rows_after_filters": 1151155,
+      "processing_time_sec": 1.402383804321289,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        8
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-08_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-08.parquet",
+      "filename": "yellow_tripdata_2022-08.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3152677,
+      "output_rows": 2220,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 53,
+        "low_count": 4652
+      },
+      "raw_rows_after_filters": 3152624,
+      "processing_time_sec": 3.9256091117858887,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        8
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-08_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-08.parquet",
+      "filename": "fhvhv_tripdata_2022-08.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 17185687,
+      "output_rows": 7749,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 270
+      },
+      "raw_rows_after_filters": 17185687,
+      "processing_time_sec": 25.16723871231079,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        8
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-08_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-09.parquet",
+      "filename": "green_tripdata_2022-09.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 69031,
+      "output_rows": 331,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 15,
+        "low_count": 3767
+      },
+      "raw_rows_after_filters": 69016,
+      "processing_time_sec": 0.5901210308074951,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        9
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-09_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-09.parquet",
+      "filename": "fhv_tripdata_2022-09.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1160493,
+      "output_rows": 1786,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5721
+      },
+      "raw_rows_after_filters": 1160493,
+      "processing_time_sec": 1.3601148128509521,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        9
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-09_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-09.parquet",
+      "filename": "yellow_tripdata_2022-09.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3183767,
+      "output_rows": 2151,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 77,
+        "low_count": 4509
+      },
+      "raw_rows_after_filters": 3183690,
+      "processing_time_sec": 3.943403482437134,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        9
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-09_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-09.parquet",
+      "filename": "fhvhv_tripdata_2022-09.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 17793551,
+      "output_rows": 7497,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 266
+      },
+      "raw_rows_after_filters": 17793551,
+      "processing_time_sec": 23.65507459640503,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        9
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-09_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-10.parquet",
+      "filename": "green_tripdata_2022-10.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 69322,
+      "output_rows": 339,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 13,
+        "low_count": 3760
+      },
+      "raw_rows_after_filters": 69309,
+      "processing_time_sec": 0.598515510559082,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        10
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-10_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-10.parquet",
+      "filename": "fhv_tripdata_2022-10.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1174988,
+      "output_rows": 1852,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5909
+      },
+      "raw_rows_after_filters": 1174988,
+      "processing_time_sec": 1.4556841850280762,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        10
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-10_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-10.parquet",
+      "filename": "yellow_tripdata_2022-10.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3675411,
+      "output_rows": 2287,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 91,
+        "low_count": 4585
+      },
+      "raw_rows_after_filters": 3675320,
+      "processing_time_sec": 4.839433431625366,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        10
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-10_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-10.parquet",
+      "filename": "fhvhv_tripdata_2022-10.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 19306090,
+      "output_rows": 7710,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 311
+      },
+      "raw_rows_after_filters": 19306090,
+      "processing_time_sec": 28.172353744506836,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        10
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-10_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-11.parquet",
+      "filename": "green_tripdata_2022-11.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 62313,
+      "output_rows": 315,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 24,
+        "low_count": 3340
+      },
+      "raw_rows_after_filters": 62289,
+      "processing_time_sec": 0.6216537952423096,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        11
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-11_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-11.parquet",
+      "filename": "fhv_tripdata_2022-11.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1106084,
+      "output_rows": 1399,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 6003
+      },
+      "raw_rows_after_filters": 1106084,
+      "processing_time_sec": 1.272240400314331,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        11
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-11_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-11.parquet",
+      "filename": "yellow_tripdata_2022-11.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3252717,
+      "output_rows": 2115,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 97,
+        "low_count": 4264
+      },
+      "raw_rows_after_filters": 3252620,
+      "processing_time_sec": 4.195164918899536,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        11
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-11_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-11.parquet",
+      "filename": "fhvhv_tripdata_2022-11.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 18085896,
+      "output_rows": 7435,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 324
+      },
+      "raw_rows_after_filters": 18085896,
+      "processing_time_sec": 26.891093015670776,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        11
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-11_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-12.parquet",
+      "filename": "green_tripdata_2022-12.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 72439,
+      "output_rows": 364,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 16,
+        "low_count": 3554
+      },
+      "raw_rows_after_filters": 72423,
+      "processing_time_sec": 0.6460025310516357,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        12
+      ],
+      "taxi_type": "green",
+      "output_path": "output-2022/intermediate/green_tripdata_2022-12_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-12.parquet",
+      "filename": "fhv_tripdata_2022-12.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 1285443,
+      "output_rows": 1983,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 5755
+      },
+      "raw_rows_after_filters": 1285443,
+      "processing_time_sec": 1.4423768520355225,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        12
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhv_tripdata_2022-12_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-12.parquet",
+      "filename": "yellow_tripdata_2022-12.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 3399549,
+      "output_rows": 2208,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 46,
+        "low_count": 4712
+      },
+      "raw_rows_after_filters": 3399503,
+      "processing_time_sec": 4.282313346862793,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        12
+      ],
+      "taxi_type": "yellow",
+      "output_path": "output-2022/intermediate/yellow_tripdata_2022-12_pivoted.parquet"
+    },
+    {
+      "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-12.parquet",
+      "filename": "fhvhv_tripdata_2022-12.parquet",
+      "success": true,
+      "error": null,
+      "status": "success",
+      "input_rows": 19665847,
+      "output_rows": 7669,
+      "discarded_rows": {
+        "parse_failure": 0,
+        "month_mismatch": 0,
+        "low_count": 351
+      },
+      "raw_rows_after_filters": 19665847,
+      "processing_time_sec": 28.71702003479004,
+      "memory_delta_mb": 0.0,
+      "expected_month": [
+        2022,
+        12
+      ],
+      "taxi_type": "fhv",
+      "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-12_pivoted.parquet"
+    }
+  ],
+  "full_stats": {
+    "input_dir": "s3://dsc291-ucsd/taxi/Dataset/2022",
+    "output_dir": "./output-2022",
+    "s3_output": "s3://dsc291-pprashant-results/taxi-wide/2022",
+    "min_rides": 50,
+    "workers": 32,
+    "total_input_rows": 267424247,
+    "total_raw_rows_after_filters": 267422585,
+    "total_output_rows": 144718,
+    "total_discarded_rows": 1662,
+    "total_discarded_raw_rows": 1662,
+    "total_discarded_pivot_rows": 169778,
+    "total_month_mismatches": 1662,
+    "total_parse_fail_rows": 0,
+    "total_removed_rows": 169778,
+    "files_with_month_mismatches": 24,
+    "num_files_processed": 48,
+    "num_errors": 0,
+    "month_stats": {
+      "2022-01": {
+        "total_input_rows": 18421708,
+        "total_raw_rows_after_filters": 18421652,
+        "total_output_rows": 11617,
+        "total_removed_rows": 14569,
+        "total_month_mismatches": 56,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-01.parquet",
+            "filename": "green_tripdata_2022-01.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 62495,
+            "output_rows": 306,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 4,
+              "low_count": 3713
+            },
+            "raw_rows_after_filters": 62491,
+            "processing_time_sec": 0.4975407123565674,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              1
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-01_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-01.parquet",
+            "filename": "fhv_tripdata_2022-01.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1143691,
+            "output_rows": 1610,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 6052
+            },
+            "raw_rows_after_filters": 1143691,
+            "processing_time_sec": 1.2775299549102783,
+            "memory_delta_mb": 0.00390625,
+            "expected_month": [
+              2022,
+              1
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-01_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-01.parquet",
+            "filename": "yellow_tripdata_2022-01.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 2463931,
+            "output_rows": 2067,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 52,
+              "low_count": 4441
+            },
+            "raw_rows_after_filters": 2463879,
+            "processing_time_sec": 3.2372889518737793,
+            "memory_delta_mb": 0.00390625,
+            "expected_month": [
+              2022,
+              1
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-01_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-01.parquet",
+            "filename": "fhvhv_tripdata_2022-01.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 14751591,
+            "output_rows": 7634,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 363
+            },
+            "raw_rows_after_filters": 14751591,
+            "processing_time_sec": 20.893373012542725,
+            "memory_delta_mb": 0.16015625,
+            "expected_month": [
+              2022,
+              1
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-01_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 21.123700618743896
+      },
+      "2022-02": {
+        "total_input_rows": 20319617,
+        "total_raw_rows_after_filters": 20319530,
+        "total_output_rows": 11120,
+        "total_removed_rows": 12976,
+        "total_month_mismatches": 87,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-02.parquet",
+            "filename": "green_tripdata_2022-02.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 69399,
+            "output_rows": 327,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 23,
+              "low_count": 3452
+            },
+            "raw_rows_after_filters": 69376,
+            "processing_time_sec": 0.5198488235473633,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              2
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-02_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-02.parquet",
+            "filename": "fhv_tripdata_2022-02.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1251504,
+            "output_rows": 1900,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5091
+            },
+            "raw_rows_after_filters": 1251504,
+            "processing_time_sec": 1.3365495204925537,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              2
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-02_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-02.parquet",
+            "filename": "yellow_tripdata_2022-02.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 2979431,
+            "output_rows": 1980,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 64,
+              "low_count": 4111
+            },
+            "raw_rows_after_filters": 2979367,
+            "processing_time_sec": 3.9773597717285156,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              2
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-02_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-02.parquet",
+            "filename": "fhvhv_tripdata_2022-02.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 16019283,
+            "output_rows": 6913,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 322
+            },
+            "raw_rows_after_filters": 16019283,
+            "processing_time_sec": 23.142824411392212,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              2
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-02_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 23.38481903076172
+      },
+      "2022-03": {
+        "total_input_rows": 23540783,
+        "total_raw_rows_after_filters": 23540670,
+        "total_output_rows": 12368,
+        "total_removed_rows": 14344,
+        "total_month_mismatches": 113,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-03.parquet",
+            "filename": "green_tripdata_2022-03.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 78537,
+            "output_rows": 372,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 24,
+              "low_count": 3862
+            },
+            "raw_rows_after_filters": 78513,
+            "processing_time_sec": 0.5451445579528809,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              3
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-03_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-03.parquet",
+            "filename": "fhv_tripdata_2022-03.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1380816,
+            "output_rows": 2087,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5638
+            },
+            "raw_rows_after_filters": 1380816,
+            "processing_time_sec": 1.5020949840545654,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              3
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-03_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-03.parquet",
+            "filename": "yellow_tripdata_2022-03.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3627882,
+            "output_rows": 2240,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 89,
+              "low_count": 4497
+            },
+            "raw_rows_after_filters": 3627793,
+            "processing_time_sec": 4.69141411781311,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              3
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-03_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-03.parquet",
+            "filename": "fhvhv_tripdata_2022-03.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 18453548,
+            "output_rows": 7669,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 347
+            },
+            "raw_rows_after_filters": 18453548,
+            "processing_time_sec": 24.92646026611328,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              3
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-03_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 25.218069791793823
+      },
+      "2022-04": {
+        "total_input_rows": 22675286,
+        "total_raw_rows_after_filters": 22675093,
+        "total_output_rows": 12314,
+        "total_removed_rows": 13562,
+        "total_month_mismatches": 193,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-04.parquet",
+            "filename": "green_tripdata_2022-04.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 76136,
+            "output_rows": 354,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 35,
+              "low_count": 3716
+            },
+            "raw_rows_after_filters": 76101,
+            "processing_time_sec": 0.5388169288635254,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              4
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-04_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-04.parquet",
+            "filename": "fhv_tripdata_2022-04.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1246669,
+            "output_rows": 2266,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5232
+            },
+            "raw_rows_after_filters": 1246669,
+            "processing_time_sec": 1.3901746273040771,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              4
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-04_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-04.parquet",
+            "filename": "yellow_tripdata_2022-04.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3599920,
+            "output_rows": 2226,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 158,
+              "low_count": 4307
+            },
+            "raw_rows_after_filters": 3599762,
+            "processing_time_sec": 4.375080108642578,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              4
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-04_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-04.parquet",
+            "filename": "fhvhv_tripdata_2022-04.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 17752561,
+            "output_rows": 7468,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 307
+            },
+            "raw_rows_after_filters": 17752561,
+            "processing_time_sec": 25.447453498840332,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              4
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-04_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 25.741780281066895
+      },
+      "2022-05": {
+        "total_input_rows": 23078349,
+        "total_raw_rows_after_filters": 23078189,
+        "total_output_rows": 12711,
+        "total_removed_rows": 14254,
+        "total_month_mismatches": 160,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-05.parquet",
+            "filename": "green_tripdata_2022-05.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 76891,
+            "output_rows": 362,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 17,
+              "low_count": 4010
+            },
+            "raw_rows_after_filters": 76874,
+            "processing_time_sec": 0.5446629524230957,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              5
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-05_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-05.parquet",
+            "filename": "fhv_tripdata_2022-05.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1255828,
+            "output_rows": 2301,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5479
+            },
+            "raw_rows_after_filters": 1255828,
+            "processing_time_sec": 1.3791587352752686,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              5
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-05_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-05.parquet",
+            "filename": "yellow_tripdata_2022-05.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3588295,
+            "output_rows": 2307,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 143,
+              "low_count": 4473
+            },
+            "raw_rows_after_filters": 3588152,
+            "processing_time_sec": 4.198506832122803,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              5
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-05_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-05.parquet",
+            "filename": "fhvhv_tripdata_2022-05.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 18157335,
+            "output_rows": 7741,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 292
+            },
+            "raw_rows_after_filters": 18157335,
+            "processing_time_sec": 27.210345029830933,
+            "memory_delta_mb": 0.0078125,
+            "expected_month": [
+              2022,
+              5
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-05_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 27.485693216323853
+      },
+      "2022-06": {
+        "total_input_rows": 22607331,
+        "total_raw_rows_after_filters": 22606810,
+        "total_output_rows": 12510,
+        "total_removed_rows": 13742,
+        "total_month_mismatches": 521,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-06.parquet",
+            "filename": "green_tripdata_2022-06.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 73718,
+            "output_rows": 351,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 9,
+              "low_count": 3942
+            },
+            "raw_rows_after_filters": 73709,
+            "processing_time_sec": 0.5500714778900146,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              6
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-06_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-06.parquet",
+            "filename": "fhv_tripdata_2022-06.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1195414,
+            "output_rows": 2414,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5124
+            },
+            "raw_rows_after_filters": 1195414,
+            "processing_time_sec": 1.3905563354492188,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              6
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-06_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-06.parquet",
+            "filename": "yellow_tripdata_2022-06.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3558124,
+            "output_rows": 2245,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 512,
+              "low_count": 4413
+            },
+            "raw_rows_after_filters": 3557612,
+            "processing_time_sec": 4.304811716079712,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              6
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-06_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-06.parquet",
+            "filename": "fhvhv_tripdata_2022-06.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 17780075,
+            "output_rows": 7500,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 263
+            },
+            "raw_rows_after_filters": 17780075,
+            "processing_time_sec": 26.20162343978882,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              6
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-06_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 26.481854677200317
+      },
+      "2022-07": {
+        "total_input_rows": 21862784,
+        "total_raw_rows_after_filters": 21862698,
+        "total_output_rows": 12407,
+        "total_removed_rows": 14518,
+        "total_month_mismatches": 86,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-07.parquet",
+            "filename": "green_tripdata_2022-07.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 64192,
+            "output_rows": 332,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 4,
+              "low_count": 3941
+            },
+            "raw_rows_after_filters": 64188,
+            "processing_time_sec": 0.5477309226989746,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              7
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-07_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-07.parquet",
+            "filename": "fhv_tripdata_2022-07.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1159579,
+            "output_rows": 2062,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5730
+            },
+            "raw_rows_after_filters": 1159579,
+            "processing_time_sec": 1.3476588726043701,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              7
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-07_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-07.parquet",
+            "filename": "yellow_tripdata_2022-07.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3174394,
+            "output_rows": 2253,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 82,
+              "low_count": 4586
+            },
+            "raw_rows_after_filters": 3174312,
+            "processing_time_sec": 4.063944101333618,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              7
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-07_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-07.parquet",
+            "filename": "fhvhv_tripdata_2022-07.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 17464619,
+            "output_rows": 7760,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 261
+            },
+            "raw_rows_after_filters": 17464619,
+            "processing_time_sec": 23.269861936569214,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              7
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-07_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 23.555970430374146
+      },
+      "2022-08": {
+        "total_input_rows": 21555448,
+        "total_raw_rows_after_filters": 21555381,
+        "total_output_rows": 12230,
+        "total_removed_rows": 14682,
+        "total_month_mismatches": 67,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-08.parquet",
+            "filename": "green_tripdata_2022-08.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 65929,
+            "output_rows": 336,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 14,
+              "low_count": 3886
+            },
+            "raw_rows_after_filters": 65915,
+            "processing_time_sec": 0.6015670299530029,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              8
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-08_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-08.parquet",
+            "filename": "fhv_tripdata_2022-08.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1151155,
+            "output_rows": 1925,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5874
+            },
+            "raw_rows_after_filters": 1151155,
+            "processing_time_sec": 1.402383804321289,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              8
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-08_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-08.parquet",
+            "filename": "yellow_tripdata_2022-08.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3152677,
+            "output_rows": 2220,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 53,
+              "low_count": 4652
+            },
+            "raw_rows_after_filters": 3152624,
+            "processing_time_sec": 3.9256091117858887,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              8
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-08_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-08.parquet",
+            "filename": "fhvhv_tripdata_2022-08.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 17185687,
+            "output_rows": 7749,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 270
+            },
+            "raw_rows_after_filters": 17185687,
+            "processing_time_sec": 25.16723871231079,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              8
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-08_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 25.465466260910034
+      },
+      "2022-09": {
+        "total_input_rows": 22206842,
+        "total_raw_rows_after_filters": 22206750,
+        "total_output_rows": 11765,
+        "total_removed_rows": 14263,
+        "total_month_mismatches": 92,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-09.parquet",
+            "filename": "green_tripdata_2022-09.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 69031,
+            "output_rows": 331,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 15,
+              "low_count": 3767
+            },
+            "raw_rows_after_filters": 69016,
+            "processing_time_sec": 0.5901210308074951,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              9
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-09_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-09.parquet",
+            "filename": "fhv_tripdata_2022-09.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1160493,
+            "output_rows": 1786,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5721
+            },
+            "raw_rows_after_filters": 1160493,
+            "processing_time_sec": 1.3601148128509521,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              9
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-09_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-09.parquet",
+            "filename": "yellow_tripdata_2022-09.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3183767,
+            "output_rows": 2151,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 77,
+              "low_count": 4509
+            },
+            "raw_rows_after_filters": 3183690,
+            "processing_time_sec": 3.943403482437134,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              9
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-09_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-09.parquet",
+            "filename": "fhvhv_tripdata_2022-09.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 17793551,
+            "output_rows": 7497,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 266
+            },
+            "raw_rows_after_filters": 17793551,
+            "processing_time_sec": 23.65507459640503,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              9
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-09_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 23.948458433151245
+      },
+      "2022-10": {
+        "total_input_rows": 24225811,
+        "total_raw_rows_after_filters": 24225707,
+        "total_output_rows": 12188,
+        "total_removed_rows": 14565,
+        "total_month_mismatches": 104,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-10.parquet",
+            "filename": "green_tripdata_2022-10.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 69322,
+            "output_rows": 339,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 13,
+              "low_count": 3760
+            },
+            "raw_rows_after_filters": 69309,
+            "processing_time_sec": 0.598515510559082,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              10
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-10_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-10.parquet",
+            "filename": "fhv_tripdata_2022-10.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1174988,
+            "output_rows": 1852,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5909
+            },
+            "raw_rows_after_filters": 1174988,
+            "processing_time_sec": 1.4556841850280762,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              10
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-10_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-10.parquet",
+            "filename": "yellow_tripdata_2022-10.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3675411,
+            "output_rows": 2287,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 91,
+              "low_count": 4585
+            },
+            "raw_rows_after_filters": 3675320,
+            "processing_time_sec": 4.839433431625366,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              10
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-10_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-10.parquet",
+            "filename": "fhvhv_tripdata_2022-10.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 19306090,
+            "output_rows": 7710,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 311
+            },
+            "raw_rows_after_filters": 19306090,
+            "processing_time_sec": 28.172353744506836,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              10
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-10_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 28.46552610397339
+      },
+      "2022-11": {
+        "total_input_rows": 22507010,
+        "total_raw_rows_after_filters": 22506889,
+        "total_output_rows": 11264,
+        "total_removed_rows": 13931,
+        "total_month_mismatches": 121,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-11.parquet",
+            "filename": "green_tripdata_2022-11.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 62313,
+            "output_rows": 315,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 24,
+              "low_count": 3340
+            },
+            "raw_rows_after_filters": 62289,
+            "processing_time_sec": 0.6216537952423096,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              11
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-11_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-11.parquet",
+            "filename": "fhv_tripdata_2022-11.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1106084,
+            "output_rows": 1399,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 6003
+            },
+            "raw_rows_after_filters": 1106084,
+            "processing_time_sec": 1.272240400314331,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              11
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-11_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-11.parquet",
+            "filename": "yellow_tripdata_2022-11.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3252717,
+            "output_rows": 2115,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 97,
+              "low_count": 4264
+            },
+            "raw_rows_after_filters": 3252620,
+            "processing_time_sec": 4.195164918899536,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              11
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-11_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-11.parquet",
+            "filename": "fhvhv_tripdata_2022-11.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 18085896,
+            "output_rows": 7435,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 324
+            },
+            "raw_rows_after_filters": 18085896,
+            "processing_time_sec": 26.891093015670776,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              11
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-11_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 27.172496557235718
+      },
+      "2022-12": {
+        "total_input_rows": 24423278,
+        "total_raw_rows_after_filters": 24423216,
+        "total_output_rows": 12224,
+        "total_removed_rows": 14372,
+        "total_month_mismatches": 62,
+        "total_parse_fail_rows": 0,
+        "files_with_month_mismatches": 2,
+        "file_results": [
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/green_taxi/green_tripdata_2022-12.parquet",
+            "filename": "green_tripdata_2022-12.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 72439,
+            "output_rows": 364,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 16,
+              "low_count": 3554
+            },
+            "raw_rows_after_filters": 72423,
+            "processing_time_sec": 0.6460025310516357,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              12
+            ],
+            "taxi_type": "green",
+            "output_path": "output-2022/intermediate/green_tripdata_2022-12_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/for_hire_vehicle/fhv_tripdata_2022-12.parquet",
+            "filename": "fhv_tripdata_2022-12.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 1285443,
+            "output_rows": 1983,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 5755
+            },
+            "raw_rows_after_filters": 1285443,
+            "processing_time_sec": 1.4423768520355225,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              12
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhv_tripdata_2022-12_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/yellow_taxi/yellow_tripdata_2022-12.parquet",
+            "filename": "yellow_tripdata_2022-12.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 3399549,
+            "output_rows": 2208,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 46,
+              "low_count": 4712
+            },
+            "raw_rows_after_filters": 3399503,
+            "processing_time_sec": 4.282313346862793,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              12
+            ],
+            "taxi_type": "yellow",
+            "output_path": "output-2022/intermediate/yellow_tripdata_2022-12_pivoted.parquet"
+          },
+          {
+            "file_path": "s3://dsc291-ucsd/taxi/Dataset/2022/high_volume_for_hire_vehicle/fhvhv_tripdata_2022-12.parquet",
+            "filename": "fhvhv_tripdata_2022-12.parquet",
+            "success": true,
+            "error": null,
+            "status": "success",
+            "input_rows": 19665847,
+            "output_rows": 7669,
+            "discarded_rows": {
+              "parse_failure": 0,
+              "month_mismatch": 0,
+              "low_count": 351
+            },
+            "raw_rows_after_filters": 19665847,
+            "processing_time_sec": 28.71702003479004,
+            "memory_delta_mb": 0.0,
+            "expected_month": [
+              2022,
+              12
+            ],
+            "taxi_type": "fhv",
+            "output_path": "output-2022/intermediate/fhvhv_tripdata_2022-12_pivoted.parquet"
+          }
+        ],
+        "errors": 0,
+        "processing_time_sec": 29.013389825820923
+      }
+    },
+    "phase_stats": {
+      "discovery": {
+        "time": 0.10078954696655273,
+        "memory_mb": 17.44140625
+      },
+      "validation": {
+        "time": 6.097257852554321,
+        "memory_mb": 13.515625
+      },
+      "processing": {
+        "time": 307.06257462501526,
+        "memory_mb": 0.765625
+      },
+      "combine": {
+        "time": 1.9816346168518066,
+        "memory_mb": 297.0703125
+      }
+    },
+    "wall_clock_start": "2026-02-09T20:54:38.957909",
+    "num_files_discovered": 48,
+    "discovery_time_sec": 0.10076141357421875,
+    "common_schema": {
+      "datetime": "pickup_datetime",
+      "location": "PUlocationID"
+    },
+    "intermediate_dir": "output-2022/intermediate",
+    "num_intermediate_files_expected": 48,
+    "month_mismatch_by_month": {
+      "2022-01": 56,
+      "2022-02": 87,
+      "2022-03": 113,
+      "2022-04": 193,
+      "2022-05": 160,
+      "2022-06": 521,
+      "2022-07": 86,
+      "2022-08": 67,
+      "2022-09": 92,
+      "2022-10": 104,
+      "2022-11": 121,
+      "2022-12": 62
+    },
+    "files_with_month_mismatches_by_month": {
+      "2022-01": 2,
+      "2022-02": 2,
+      "2022-03": 2,
+      "2022-04": 2,
+      "2022-05": 2,
+      "2022-06": 2,
+      "2022-07": 2,
+      "2022-08": 2,
+      "2022-09": 2,
+      "2022-10": 2,
+      "2022-11": 2,
+      "2022-12": 2
+    },
+    "wide_table_rows": 121480,
+    "wide_table_path": "s3://dsc291-pprashant-results/taxi-wide/2022",
+    "combine_time_sec": 1.9816200733184814,
+    "output_rows": 121480,
+    "output_path": "s3://dsc291-pprashant-results/taxi-wide/2022",
+    "num_intermediate_files": 48,
+    "intermediate_total_rows": 144718,
+    "num_hour_columns": 24,
+    "output_columns": [
+      "hour_0",
+      "hour_1",
+      "hour_2",
+      "hour_3",
+      "hour_4",
+      "hour_5",
+      "hour_6",
+      "hour_7",
+      "hour_8",
+      "hour_9",
+      "hour_10",
+      "hour_11",
+      "hour_12",
+      "hour_13",
+      "hour_14",
+      "hour_15",
+      "hour_16",
+      "hour_17",
+      "hour_18",
+      "hour_19",
+      "hour_20",
+      "hour_21",
+      "hour_22",
+      "hour_23"
+    ],
+    "num_output_columns": 24,
+    "row_breakdown_by_year_and_taxi_type": {
+      "2022": {
+        "fhv": 91092,
+        "green": 4089,
+        "yellow": 26299
+      }
+    },
+    "total_runtime_sec": 315.2443280220032,
+    "discarded_raw_pct": 6.214844086295586e-06,
+    "discarded_pivot_pct": 0.5398415242165242,
+    "peak_memory_mb": 475.06640625,
+    "wall_clock_end": "2026-02-09T20:59:54.202241",
+    "process_info": {
+      "memory_rss_mb": 475.31640625,
+      "peak_memory_mb": 475.06640625
+    }
+  }
+}
