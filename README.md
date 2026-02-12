@@ -101,6 +101,68 @@ This will:
 
 ---
 
+## Homework 2 — PCA, tail analysis & bootstrap (new)
+
+A compact toolkit and CLI to run PCA on the wide table, analyze coefficient tails, produce a Folium map of the first two PCs by pickup zone, and run bootstrap stability checks.
+
+Quick CLI example (reads the public wide table; writes results locally):
+
+```bash
+python -m pivot_and_bootstrap.hw2_run \
+  --input s3://dsc291-pprashant-results/taxi-wide/full \
+  --output-dir ./hw2_output --anon-s3 --zones-csv ./data/taxi_zones.csv --B 100
+```
+
+Notes:
+- Default input (public read): `s3://dsc291-pprashant-results/taxi-wide/full`.
+- `--anon-s3` uses anonymous S3 access for public buckets (read-only).
+- Outputs are written to `--output-dir` (local path by default: `./hw2_output`).
+
+How to read from the public S3 input and write results to a *new* S3 location
+(you said you only want to read the input and not overwrite it):
+
+1) Recommended (safe — read from public S3, write outputs to a different S3 bucket):
+
+- Run the HW2 CLI reading from the public S3 and saving results locally, then upload the result folder to your S3 bucket:
+
+```bash
+# run (reads public S3)
+python -m pivot_and_bootstrap.hw2_run \
+  --input s3://dsc291-pprashant-results/taxi-wide/full --output-dir ./hw2_output --anon-s3 --B 100
+
+# upload produced outputs to your S3 bucket (requires AWS credentials)
+aws s3 cp ./hw2_output s3://your-bucket/hw2_output --recursive
+```
+
+2) Programmatic alternative — read from public S3 and write a specific output directly to S3 (example: CSV of PC scores):
+
+```python
+import s3fs
+from pivot_and_bootstrap.hw2_run import aggregate_scores_by_pickup_place
+
+# aggregate_scores_by_pickup_place writes a CSV using pandas.to_csv;
+# pandas + s3fs supports writing to 's3://' paths if you have write access.
+aggregate_scores_by_pickup_place(
+    pca_pkl_path='s3://dsc291-pprashant-results/taxi-wide/full/pca_model.pkl',  # or local pkl
+    parquet_path='s3://dsc291-pprashant-results/taxi-wide/full',
+    output_scores_csv='s3://your-bucket/hw2_output/pc_scores_by_pickup_place.csv'
+)
+```
+
+Caveats:
+- Writing directly to an S3 path requires credentials (or the target bucket must allow public writes). Use `s3fs.S3FileSystem(key=..., secret=...)` or set AWS env vars.
+- The HW2 CLI reads the public input by setting `storage_options={'anon': True}` when `--anon-s3` is used; this does not modify or write to the input path.
+
+3) Direct upload of any produced local file (images, JSON, pkl):
+
+```python
+import boto3
+s3 = boto3.client('s3')
+s3.upload_file('./hw2_output/pca_model.pkl', 'your-bucket', 'hw2_output/pca_model.pkl')
+```
+
+---
+
 ## CLI Arguments
 
 ### Required Arguments
