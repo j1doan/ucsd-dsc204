@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import os
 import pandas as pd
+import s3fs
 
 from .pca_analysis import fit_pca_dask
 from .tail_analysis import analyze_coefficients
@@ -40,14 +41,36 @@ def aggregate_scores_by_pickup_place(pca_pkl_path: str, parquet_path: str, outpu
     return output_scores_csv
 
 
+def upload_dir_to_s3(local_dir: str, s3_uri: str, anon: bool = False):
+    """Recursively upload a local directory to an S3 prefix using s3fs.
+
+    Intended for small-to-medium result folders created by this CLI.
+    """
+    fs = s3fs.S3FileSystem(anon=anon)
+    s3_prefix = s3_uri.rstrip("/")
+    for root, _, files in os.walk(local_dir):
+        for fname in files:
+            local_path = os.path.join(root, fname)
+            rel_path = os.path.relpath(local_path, local_dir)
+            s3_path = f"{s3_prefix}/{rel_path}"
+            fs.put(local_path, s3_path)
+    print(f"Uploaded {local_dir} -> {s3_uri}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="s3://dsc291-pprashant-results/taxi-wide/full", help="Parquet wide table path")
     parser.add_argument("--output-dir", default="./hw2_output")
+    parser.add_argument("--s3-output", default=None, help="Optional S3 URI to upload outputs after run (e.g. s3://my-bucket/path/)")
     parser.add_argument("--anon-s3", action="store_true")
     parser.add_argument("--zones-csv", default=None, help="CSV with pickup_place,latitude,longitude")
     parser.add_argument("--B", type=int, default=100)
+    parser.add_argument("--workers", type=int, default=None, help="Number of workers for parallel tasks (optional)")
     args = parser.parse_args()
+
+    # expose worker count to child modules via env var (optional)
+    if args.workers is not None:
+        os.environ["HW2_WORKERS"] = str(args.workers)
 
     sopts = {"anon": True} if args.anon_s3 else None
 
@@ -83,6 +106,13 @@ def main():
     print("Running bootstrap stability analysis (Part 4)")
     boot_res = bootstrap_pca_stability(args.input, args.output_dir, B=args.B, n_components=2)
     print("Bootstrap results:", boot_res)
+
+    # upload results to S3 if requested
+    if getattr(args, "s3_output", None):
+        try:
+            upload_dir_to_s3(args.output_dir, args.s3_output, anon=args.anon_s3)
+        except Exception as _e:
+            print("Warning: failed to upload outputs to S3:", _e)
 
 
 if __name__ == "__main__":
