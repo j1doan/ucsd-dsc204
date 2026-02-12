@@ -1,0 +1,8 @@
+{
+  "classification": "heavy_tail",
+  "alpha": 5.933107331590656,
+  "r2": 0.9823823975607736,
+  "tail_fraction": 0.05,
+  "tail_points": 29,
+  "coefficient_distribution_png": "./hw2_output/coefficient_distribution.png"
+}

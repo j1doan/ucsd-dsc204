@@ -1,0 +1,16 @@
+{
+  "B": 100,
+  "n_components": 2,
+  "procrustes_dist_mean": 0.006567081625493751,
+  "procrustes_dist_std": 0.004425133852063119,
+  "subspace_affinity_mean": 0.9999686477376567,
+  "subspace_affinity_std": 5.375469476649644e-05,
+  "component_correlation_mean": [
+    0.9999870930727957,
+    0.9999686429050041
+  ],
+  "component_correlation_std": [
+    2.0132795493390587e-05,
+    5.4588820083282505e-05
+  ]
+}
