@@ -39,7 +39,7 @@ This pipeline processes raw NYC TLC taxi trip data (Parquet format) into an anal
 ### Required Packages
 
 ```bash
-pip install pandas numpy pyarrow dask[dataframe] fsspec s3fs psutil tqdm
+pip install pandas numpy pyarrow dask[dataframe] fsspec s3fs psutil tqdm scipy matplotlib folium scikit-learn
 ```
 
 **Note:** Install all packages together to ensure compatibility. If running on AWS:
@@ -458,10 +458,35 @@ DSC 204/
 ├── pivot_utils.py                 # Core utilities (Parts 1-2)
 ├── partition_optimization.py       # Partition sizing (Part 3)
 ├── pivot_all_files.py             # Main pipeline (Part 4)
+├── pivot_and_bootstrap/           # HW2: PCA, Tail, Map, Bootstrap
 ├── test_pivot_comprehensive.py    # Test suite (Part 5)
 ├── README.md                       # Documentation (Part 6)
 └── performance.md                  # Performance report (generated after running)
 ```
+
+---
+
+## HW2: PCA, Tail Analysis, Folium Map, & Bootstrap Stability
+
+A companion package lives under `pivot_and_bootstrap/` and implements the four parts of HW2:
+
+- Part 1: PCA on the unnormalized wide table (`pca_analysis.fit_pca_dask`) — saves `pca_model.pkl` and `variance_explained.png`.
+- Part 2: Tail analysis on eigenvector coefficients (`tail_analysis.analyze_coefficients`) — saves `coefficient_distribution.png` and `tail_analysis_report.json`.
+- Part 3: Folium map of aggregated PC1/PC2 scores by `pickup_place` (`mapping.create_pc1_pc2_map`) — saves `pc1_pc2_folium_map.html`.
+- Part 4: Bootstrap stability of eigenvectors (`bootstrap_stability.bootstrap_pca_stability`) — saves `bootstrap_stability_report.json` and stability plots.
+
+Quick run (requires `folium`, `scipy`, and standard packages listed above):
+
+```bash
+python -m pivot_and_bootstrap.hw2_run \
+  --input s3://dsc291-pprashant-results/taxi-wide/full \
+  --output-dir ./hw2_output --anon-s3 --zones-csv ./data/taxi_zones.csv --B 100
+```
+
+Notes:
+- If your S3 bucket is public, pass `--anon-s3` to use anonymous access.
+- Provide `--zones-csv` (with `pickup_place,latitude,longitude`) to enable the Folium map.
+- The default input path is `s3://dsc291-pprashant-results/taxi-wide/full` as requested.
 
 ---
 
