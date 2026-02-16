@@ -105,12 +105,14 @@ This will:
 
 A compact toolkit and CLI to run PCA on the wide table, analyze coefficient tails, produce a Folium map of the first two PCs by pickup zone, and run bootstrap stability checks.
 
-Quick CLI example (reads the public wide table; writes results locally):
+Quick CLI example (reads the public wide table; writes results locally and optionally uploads to S3):
 
 ```bash
 python -m pivot_and_bootstrap.hw2_run \
   --input s3://dsc291-pprashant-results/taxi-wide/full \
-  --output-dir ./hw2_output --anon-s3 --zones-csv ./data/taxi_zones.csv --B 100
+  --output-dir ./hw2_output \
+  --s3-output s3://dsc291-ucsd/taxi/hw2_output \
+  --zones-csv ./data/taxi_zones.csv --workers 8 --B 100
 ```
 
 Notes:
