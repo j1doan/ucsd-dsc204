@@ -70,35 +70,53 @@ def is_s3_path(path: str) -> bool:
 def get_s3_filesystem():
     """Get S3 filesystem with optimized settings."""
     return s3fs.S3FileSystem(
-        anon=True,  # Anonymous access for public buckets
+        anon=False,  # Use configured credentials (from aws configure)
         requester_pays=False,
-        skip_instance_metadata=True,
     )
 
 
 def discover_parquet_files(input_path: str) -> List[str]:
     """
-    Discover parquet files recursively from local or S3 path.
+    Discover parquet files from local directory, S3 path, or comma-separated file list.
     
     Args:
-        input_path: Local path or S3 URI
+        input_path: Local path, S3 URI, or comma-separated file paths
         
     Returns:
         Sorted list of parquet file paths
     """
     files = []
     
+    # Check if input is comma-separated file paths
+    if ',' in input_path:
+        # Split and clean up each path
+        files = [p.strip() for p in input_path.split(',')]
+        logger.info(f"Discovered {len(files)} parquet files from comma-separated list")
+        return files
+    
+    # Check if it's an S3 path
     if is_s3_path(input_path):
         fs = get_s3_filesystem()
-        # Recursive glob
-        pattern = f"{input_path.rstrip('/')}/**/*.parquet"
-        files = sorted(fs.glob(pattern))
-        files = [f"s3://{f}" if not f.startswith('s3://') else f for f in files]
+        
+        # If it's a direct file path (ends with .parquet), return it directly
+        if input_path.endswith('.parquet'):
+            files = [input_path]
+        else:
+            # Otherwise, treat as directory and glob recursively
+            pattern = f"{input_path.rstrip('/')}/**/*.parquet"
+            files = sorted(fs.glob(pattern))
+            files = [f"s3://{f}" if not f.startswith('s3://') else f for f in files]
     else:
         # Local filesystem
         input_dir = Path(input_path)
-        files = sorted(input_dir.glob('**/*.parquet'))
-        files = [str(f) for f in files]
+        
+        # If it's a single file, return it directly
+        if input_dir.suffix == '.parquet':
+            files = [str(input_dir)]
+        else:
+            # Otherwise, glob recursively
+            files = sorted(input_dir.glob('**/*.parquet'))
+            files = [str(f) for f in files]
     
     logger.info(f"Discovered {len(files)} parquet files")
     return files
@@ -168,12 +186,13 @@ def read_parquet_dask(
     return ddf
 
 
-def normalize_schema_dask(ddf: dd.DataFrame) -> dd.DataFrame:
+def normalize_schema_dask(ddf: dd.DataFrame, taxi_type: Optional[str] = None) -> dd.DataFrame:
     """
     Normalize column names to standard schema (vectorized).
     
     Args:
         ddf: Dask DataFrame
+        taxi_type: Optional taxi type to add as column (inferred from filename if not provided)
         
     Returns:
         Normalized Dask DataFrame
@@ -198,6 +217,11 @@ def normalize_schema_dask(ddf: dd.DataFrame) -> dd.DataFrame:
     if 'pickup_datetime' in ddf.columns:
         ddf['pickup_datetime'] = dd.to_datetime(ddf['pickup_datetime'], errors='coerce')
     
+    # Add taxi_type column if not already present and if provided
+    if taxi_type and 'taxi_type' not in ddf.columns:
+        ddf['taxi_type'] = taxi_type
+        logger.info(f"Added taxi_type column: {taxi_type}")
+    
     return ddf
 
 
@@ -216,26 +240,33 @@ def pivot_counts_dask(ddf: dd.DataFrame) -> dd.DataFrame:
         ddf: Normalized Dask DataFrame with pickup_datetime, pickup_location, taxi_type
         
     Returns:
-        Dask DataFrame indexed by (taxi_type, date, pickup_location)
+        Dask DataFrame indexed by (taxi_type, date, pickup_location) with hour_0...hour_23 columns
     """
     
     # Extract date and hour (vectorized)
     ddf['date'] = ddf['pickup_datetime'].dt.date
     ddf['hour'] = ddf['pickup_datetime'].dt.hour
     
-    # Group and count using Dask
-    # This is more efficient than pivot_table for large data
-    agg_df = ddf.groupby(
-        ['taxi_type', 'date', 'pickup_location', 'hour']
-    ).size().reset_index(name='count')
+    # Select only needed columns
+    ddf = ddf[['taxi_type', 'date', 'pickup_location', 'hour']]
     
-    # Pivot: convert hour column to separate columns
-    # Use pd.pivot_table on each partition, then concat
+    # Create a count column (1 per row)
+    ddf['count'] = 1
+    
+    # Group and sum count by (taxi_type, date, pickup_location, hour)
+    grouped = ddf.groupby(['taxi_type', 'date', 'pickup_location', 'hour']).agg({'count': 'sum'})
+    grouped = grouped.reset_index()
+    
+    # Pivot using a map_partitions with proper metadata
     def pivot_partition(pdf):
         """Pivot a single partition."""
         if len(pdf) == 0:
-            return pdf
+            # Return empty dataframe with expected schema
+            hour_cols = [f'hour_{i}' for i in range(24)]
+            result_cols = ['taxi_type', 'date', 'pickup_location'] + hour_cols
+            return pd.DataFrame(columns=result_cols)
         
+        # Pivot the partition
         pivoted = pdf.pivot_table(
             index=['taxi_type', 'date', 'pickup_location'],
             columns='hour',
@@ -243,38 +274,45 @@ def pivot_counts_dask(ddf: dd.DataFrame) -> dd.DataFrame:
             fill_value=0,
             aggfunc='sum'
         )
+        
+        # Rename hour columns to hour_0, hour_1, etc.
+        hour_rename = {i: f'hour_{i}' for i in range(24) if i in pivoted.columns}
+        pivoted = pivoted.rename(columns=hour_rename)
+        
+        # Add missing hour columns with 0
+        for i in range(24):
+            col_name = f'hour_{i}'
+            if col_name not in pivoted.columns:
+                pivoted[col_name] = 0
+        
+        # Sort columns
+        hour_cols = sorted([f'hour_{i}' for i in range(24)])
+        pivoted = pivoted[hour_cols]
+        
         return pivoted.reset_index()
     
-    # Apply pivot to each partition
-    pivoted = agg_df.map_partitions(
+    # Create proper metadata (list of columns with dtypes)
+    hour_cols = [f'hour_{i}' for i in range(24)]
+    meta_dict = {
+        'taxi_type': 'object',
+        'date': 'object',
+        'pickup_location': 'int64',
+    }
+    for col in hour_cols:
+        meta_dict[col] = 'int64'
+    
+    # Apply pivot to each partition with proper metadata
+    pivoted = grouped.map_partitions(
         pivot_partition,
-        meta=('object', 'object')
+        meta=meta_dict
     )
     
-    # Fill missing hour columns with 0
-    for hour in range(24):
-        col_name = f'hour_{hour}'
-        if col_name not in pivoted.columns:
-            pivoted[col_name] = 0
-    
-    # Select only hour columns
-    hour_cols = sorted([f'hour_{i}' for i in range(24)])
-    index_cols = ['taxi_type', 'date', 'pickup_location']
-    
-    # Ensure all required columns exist
-    for col in index_cols + hour_cols:
-        if col not in pivoted.columns:
-            pivoted[col] = 0
-    
-    pivoted = pivoted[index_cols + hour_cols]
-    
-    # Lazy operation: set proper multi-index for efficient grouping/aggregation later
-    pivoted = pivoted.set_index(index_cols)
+    # Set index for efficient operations later
+    pivoted = pivoted.set_index(['taxi_type', 'date', 'pickup_location'])
     
     # Lazy operation: repartition for balanced workload across workers
     if OPTIMIZE_PARTITIONS:
-        # Estimate optimal partitions based on size
-        pivoted = pivoted.repartition(npartitions=min(NUM_WORKERS * 4, max(pivoted.npartitions, NUM_WORKERS)))
+        pivoted = pivoted.repartition(npartitions=NUM_WORKERS)
     
     logger.info(f"Pivoted to {len(hour_cols)} hour columns, indexed and repartitioned")
     
@@ -296,7 +334,7 @@ def cleanup_low_count_rows_dask(
     Uses vectorized sum operation—no row-based apply.
     
     Args:
-        ddf: Dask DataFrame with hour_0, hour_1, ..., hour_23 columns
+        ddf: Dask DataFrame with hour_0, hour_1, ..., hour_23 columns (may be indexed)
         min_rides: Minimum rides threshold
         
     Returns:
@@ -308,35 +346,33 @@ def cleanup_low_count_rows_dask(
     if not hour_cols:
         logger.warning("No hour columns found")
         stats = {
-            'rows_before': len(ddf),
-            'rows_after': len(ddf),
+            'rows_before': 0,
+            'rows_after': 0,
             'rows_removed': 0,
             'min_rides': min_rides,
         }
         return ddf, stats
     
-    # Calculate total rides (vectorized)
+    # Calculate total rides (vectorized, lazy operation)
     ddf = ddf.copy()
     ddf['total_rides'] = ddf[hour_cols].sum(axis=1)
     
     # Filter (lazy operation - not executed yet)
-    rows_before = len(ddf)
     ddf_cleaned = ddf[ddf['total_rides'] >= min_rides].drop(columns=['total_rides'])
     
     # Lazy operation: repartition after filter for balanced distribution
-    if OPTIMIZE_PARTITIONS and ddf_cleaned.npartitions > NUM_WORKERS:
+    if OPTIMIZE_PARTITIONS:
         ddf_cleaned = ddf_cleaned.repartition(npartitions=NUM_WORKERS)
     
-    rows_after = len(ddf_cleaned)
-    
+    # Create stats dict (these counts won't be computed until later)
     stats = {
-        'rows_before': rows_before,
-        'rows_after': rows_after,
-        'rows_removed': rows_before - rows_after,
+        'rows_before': 'unknown',  # Will be computed later
+        'rows_after': 'unknown',
+        'rows_removed': 'unknown',
         'min_rides': min_rides,
     }
     
-    logger.info(f"Cleanup: {rows_before} → {rows_after} rows (removed {rows_before - rows_after})")
+    logger.info(f"Configured cleanup filter: min_rides={min_rides} (counts computed at persist time)")
     
     return ddf_cleaned, stats
 
@@ -356,6 +392,8 @@ def process_month_dask(
     """
     Process a single month of parquet files through the pivot pipeline.
     
+    Reads with Dask, then computes for pivoting (simpler and more reliable).
+    
     Args:
         month_files: List of parquet files for this month
         output_dir: Output directory for intermediate results
@@ -370,57 +408,93 @@ def process_month_dask(
     start_time = time.time()
     logger.info(f"Processing {year}-{month:02d} ({len(month_files)} files)")
     
-    # Read all files for this month
-    ddf = read_parquet_dask(month_files)
+    # Infer taxi type from first file
+    taxi_type = infer_taxi_type_from_path(month_files[0])
+    if not taxi_type:
+        logger.warning(f"Could not infer taxi_type from {month_files[0]}, defaulting to 'yellow'")
+        taxi_type = 'yellow'
     
-    # Normalize schema
-    ddf = normalize_schema_dask(ddf)
-    
-    # Pivot
-    ddf = pivot_counts_dask(ddf)
-    
-    # Cleanup low-count rows
-    ddf, cleanup_stats = cleanup_low_count_rows_dask(ddf, min_rides=min_rides)
-    
-    # Lazy operation: reset_index to flatten multi-index before writing
-    ddf = ddf.reset_index()
-    
-    # Lazy operation: repartition for balanced write performance
-    if OPTIMIZE_PARTITIONS:
-        ddf = ddf.repartition(npartitions=NUM_WORKERS)
-    
-    # Persist to RAM (pin dataset) - forces computation up to this point
-    ddf = ddf.persist()
-    
-    # Compute final count
-    final_count = len(ddf)
-    
-    # Write intermediate result with compression
-    output_subdir = Path(output_dir) / 'intermediate' / f'{year:04d}/{month:02d}'
-    output_subdir.mkdir(parents=True, exist_ok=True)
-    
-    output_file = str(output_subdir / 'data.parquet')
-    ddf.to_parquet(
-        output_file,
-        engine='pyarrow',
-        compression=COMPRESSION,
-        write_index=WRITE_INDEX,
-    )
-    
-    elapsed = time.time() - start_time
-    
-    stats = {
-        'year': year,
-        'month': month,
-        'files_processed': len(month_files),
-        'rows_output': final_count,
-        'time_seconds': elapsed,
-        'cleanup_stats': cleanup_stats,
-    }
-    
-    logger.info(f"Completed {year}-{month:02d} in {elapsed:.2f}s ({final_count} rows)")
-    
-    return stats
+    try:
+        # Read all files for this month with Dask
+        ddf = read_parquet_dask(month_files)
+        logger.info(f"Loaded {len(month_files)} files, {ddf.npartitions} partitions")
+        
+        # Normalize schema
+        ddf = normalize_schema_dask(ddf, taxi_type=taxi_type)
+        
+        # Compute to pandas (S3 I/O already handled by Dask read)
+        logger.info("Computing DataFrame from partitions...")
+        df = ddf.compute()
+        logger.info(f"Computed: {len(df)} rows")
+        
+        # Now use the reliable pivot_utils function
+        from pivot_utils import (
+            find_pickup_datetime_col,
+            find_pickup_location_col,
+            pivot_counts_date_taxi_type_location,
+            cleanup_low_count_rows,
+        )
+        
+        columns = df.columns.tolist()
+        datetime_col = find_pickup_datetime_col(columns)
+        location_col = find_pickup_location_col(columns)
+        
+        if not datetime_col or not location_col:
+            raise ValueError(f"Missing required columns (datetime: {datetime_col}, location: {location_col})")
+        
+        # Pivot using pandas
+        logger.info("Pivoting data...")
+        pivoted = pivot_counts_date_taxi_type_location(
+            df,
+            datetime_col=datetime_col,
+            location_col=location_col,
+            taxi_type_col='taxi_type'
+        )
+        logger.info(f"Pivoted to {len(pivoted)} rows")
+        
+        # Cleanup
+        logger.info(f"Cleaning up rows with < {min_rides} rides...")
+        df_cleaned, cleanup_stats = cleanup_low_count_rows(pivoted, min_rides=min_rides)
+        
+        final_count = len(df_cleaned)
+        logger.info(f"After cleanup: {final_count} rows (removed {cleanup_stats.get('rows_removed', 0)})")
+        
+        # Write intermediate result
+        output_subdir = Path(output_dir) / 'intermediate' / f'{year:04d}/{month:02d}'
+        output_subdir.mkdir(parents=True, exist_ok=True)
+        
+        output_file = str(output_subdir / 'data.parquet')
+        df_cleaned.to_parquet(
+            output_file,
+            engine='pyarrow',
+            compression=COMPRESSION,
+            index=True,  # Preserve the multi-index
+        )
+        logger.info(f"Wrote intermediate: {output_file}")
+        
+        elapsed = time.time() - start_time
+        
+        stats = {
+            'year': year,
+            'month': month,
+            'files_processed': len(month_files),
+            'rows_output': final_count,
+            'time_seconds': elapsed,
+            'cleanup_stats': cleanup_stats,
+        }
+        
+        logger.info(f"Completed {year}-{month:02d} in {elapsed:.2f}s ({final_count} rows)")
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Error processing {year}-{month:02d}: {e}", exc_info=True)
+        return {
+            'year': year,
+            'month': month,
+            'error': str(e),
+            'time_seconds': time.time() - start_time,
+        }
 
 
 # ============================================================================
@@ -435,7 +509,7 @@ def combine_into_wide_table_dask(
     """
     Combine all intermediate pivoted tables into a single wide table.
     
-    Uses Dask for memory-efficient aggregation.
+    Reads with Dask, then computes to pandas for simple aggregation.
     
     Args:
         intermediate_dir: Directory with intermediate parquet files
@@ -458,59 +532,55 @@ def combine_into_wide_table_dask(
         logger.warning("No intermediate files found")
         return {'rows_output': 0, 'time_seconds': 0}
     
-    # Read all intermediate files
-    ddf = read_parquet_dask(intermediate_files)
-    
-    # Get hour columns
-    hour_cols = sorted([col for col in ddf.columns if col.startswith('hour_')])
-    index_cols = [col for col in ['taxi_type', 'date', 'pickup_location'] 
-                  if col in ddf.columns]
-    
-    # Lazy operation: set_index before groupby for better performance
-    ddf = ddf.set_index(index_cols)
-    
-    # Lazy operation: repartition indexed data for efficient distributed groupby
-    if OPTIMIZE_PARTITIONS:
-        ddf = ddf.repartition(npartitions=NUM_WORKERS * 2)
-    
-    # Aggregate by (taxi_type, date, pickup_location), summing hours (lazy operation)
-    agg_dict = {col: 'sum' for col in hour_cols}
-    ddf_combined = ddf.groupby(level=list(range(len(index_cols)))).agg(agg_dict)
-    
-    # Lazy operation: repartition combined data for balanced write
-    if OPTIMIZE_PARTITIONS:
-        ddf_combined = ddf_combined.repartition(npartitions=NUM_WORKERS)
-    
-    # Persist to RAM - forces computation and pins hot data
-    ddf_combined = ddf_combined.persist()
-    
-    # Get final count
-    final_count = len(ddf_combined)
-    
-    # Lazy operation: reset_index to flatten for storage
-    ddf_combined = ddf_combined.reset_index()
-    
-    # Write final table with compression and optimizations
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    ddf_combined.to_parquet(
-        output_path,
-        engine='pyarrow',
-        compression=COMPRESSION,
-        write_index=WRITE_INDEX,
-        write_metadata_file=True,  # For better partition discovery
-    )
-    
-    elapsed = time.time() - start_time
-    
-    stats = {
-        'rows_output': final_count,
-        'time_seconds': elapsed,
-        'hour_columns': len(hour_cols),
-    }
-    
-    logger.info(f"Combined into single table: {final_count} rows in {elapsed:.2f}s")
-    
-    return stats
+    try:
+        # Read all intermediate files with Dask
+        ddf = read_parquet_dask(intermediate_files)
+        logger.info(f"Loaded {len(intermediate_files)} files with {ddf.npartitions} partitions")
+        
+        # Compute to pandas (for simple final aggregation)
+        logger.info("Computing final table...")
+        df_combined = ddf.compute()
+        logger.info(f"Computed: {len(df_combined)} rows")
+        
+        # Get hour columns
+        hour_cols = sorted([col for col in df_combined.columns if col.startswith('hour_')])
+        index_cols = ['taxi_type', 'date', 'pickup_place']
+        
+        logger.info(f"Index columns: {index_cols}, Hour columns: {len(hour_cols)}")
+        
+        # Aggregate by index columns, summing hours
+        if all(col in df_combined.columns for col in index_cols):
+            logger.info("Aggregating by (taxi_type, date, pickup_place)...")
+            df_combined = df_combined.groupby(index_cols)[hour_cols].sum().reset_index()
+            logger.info(f"After aggregation: {len(df_combined)} rows")
+        
+        final_count = len(df_combined)
+        
+        # Write final table
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Writing final table to {output_path}")
+        df_combined.to_parquet(
+            output_path,
+            engine='pyarrow',
+            compression=COMPRESSION,
+            index=False,
+        )
+        
+        elapsed = time.time() - start_time
+        
+        stats = {
+            'rows_output': final_count,
+            'time_seconds': elapsed,
+            'hour_columns': len(hour_cols),
+        }
+        
+        logger.info(f"Combined into single table: {final_count} rows in {elapsed:.2f}s")
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Error combining tables: {e}", exc_info=True)
+        return {'rows_output': 0, 'time_seconds': time.time() - start_time, 'error': str(e)}
 
 
 # ============================================================================
