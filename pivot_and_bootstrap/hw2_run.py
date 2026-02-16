@@ -17,7 +17,7 @@ from .bootstrap_stability import bootstrap_pca_stability
 
 
 def aggregate_scores_by_pickup_place(pca_pkl_path: str, parquet_path: str, output_scores_csv: str):
-    # Compute PC scores = X @ components for each row and aggregate mean by pickup_place
+    # Compute PC scores from centered features and aggregate mean by pickup_place
     import pickle
     import numpy as np
 
@@ -29,12 +29,21 @@ def aggregate_scores_by_pickup_place(pca_pkl_path: str, parquet_path: str, outpu
     # Load parquet in chunks (pandas) to compute scores
     df = pd.read_parquet(parquet_path)
     X = df[hour_cols].fillna(df[hour_cols].mean())
-    scores = X.values @ components  # (n_rows, n_components)
+    mean = model.get("mean")
+    if mean is None:
+        raise ValueError("PCA model is missing mean vector required for score computation")
+    scores = (X.values - mean) @ components  # (n_rows, n_components)
     n_comp = components.shape[1]
-    cols = {i: f"pc{i+1}" for i in range(1, n_comp + 1)}
 
     scores_df = pd.DataFrame(scores, columns=[f"pc{i+1}" for i in range(n_comp)])
-    scores_df["pickup_place"] = df.index.get_level_values("pickup_place") if hasattr(df.index, "names") else df["pickup_place"]
+    if isinstance(df.index, pd.MultiIndex) and "pickup_place" in (df.index.names or []):
+        scores_df["pickup_place"] = df.index.get_level_values("pickup_place")
+    elif "pickup_place" in df.columns:
+        scores_df["pickup_place"] = df["pickup_place"].values
+    else:
+        raise ValueError(
+            "Could not locate pickup_place in index or columns; required for Part 3 aggregation"
+        )
 
     agg = scores_df.groupby("pickup_place").mean().reset_index()
     agg.to_csv(output_scores_csv, index=False)
@@ -64,6 +73,7 @@ def main():
     parser.add_argument("--s3-output", default=None, help="Optional S3 URI to upload outputs after run (e.g. s3://my-bucket/path/)")
     parser.add_argument("--anon-s3", action="store_true")
     parser.add_argument("--zones-csv", default=None, help="CSV with pickup_place,latitude,longitude")
+    parser.add_argument("--zones-shp", default=None, help="Optional zones shapefile for centroid extraction by LocationID")
     parser.add_argument("--B", type=int, default=100)
     parser.add_argument("--workers", type=int, default=None, help="Number of workers for parallel tasks (optional)")
     args = parser.parse_args()
@@ -96,10 +106,13 @@ def main():
     if args.zones_csv is None:
         print("No zones CSV provided; skipping map creation. Provide --zones-csv to enable map.")
     else:
-        zones_df = pd.read_csv(args.zones_csv)
+        if isinstance(args.zones_csv, str) and args.zones_csv.startswith("s3://") and sopts:
+            zones_df = pd.read_csv(args.zones_csv, storage_options=sopts)
+        else:
+            zones_df = pd.read_csv(args.zones_csv)
         scores_df = pd.read_csv(scores_csv)
         map_path = os.path.join(args.output_dir, "pc1_pc2_folium_map.html")
-        create_pc1_pc2_map(scores_df, zones_df, map_path)
+        create_pc1_pc2_map(scores_df, zones_df, map_path, zones_shp_path=args.zones_shp)
         print("Saved map to", map_path)
 
     # Part 4: Bootstrap

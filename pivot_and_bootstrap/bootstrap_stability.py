@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import pickle
+import shutil
 from typing import Dict, List
 
 import numpy as np
@@ -136,6 +137,9 @@ def bootstrap_pca_stability(parquet_path: str, output_dir: str, B: int = 100, n_
     png1 = os.path.join(output_dir, "eigenvector_corr_boxplot.png")
     plt.savefig(png1, dpi=150)
     plt.close()
+    # Assignment deliverable name
+    eigenvector_stability_png = os.path.join(output_dir, "eigenvector_stability.png")
+    shutil.copyfile(png1, eigenvector_stability_png)
 
     # Plot coefficient bands for first component across bootstraps
     b1_all = np.stack([b[:, 0] for b in bootstrap_components], axis=1)  # (features, B)
@@ -158,6 +162,7 @@ def bootstrap_pca_stability(parquet_path: str, output_dir: str, B: int = 100, n_
     return {
         "report_json": json_path,
         "eigen_corr_boxplot": png1,
+        "eigenvector_stability_png": eigenvector_stability_png,
         "pc1_band": png2,
     }
 
