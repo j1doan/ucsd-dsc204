@@ -80,7 +80,7 @@ def analyze_coefficients(components: np.ndarray, output_dir: str, tail_fraction:
         r2 = r_value ** 2
 
         # Heuristic classification
-        if r2 > 0.85 and alpha is not None and 0 < alpha < 20:
+        if r2 > 0.85 and alpha is not None and 0 < alpha < 5:
             classification = "heavy_tail"
         else:
             classification = "light_tail"
