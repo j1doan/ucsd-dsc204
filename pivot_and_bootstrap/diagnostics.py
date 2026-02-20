@@ -5,8 +5,7 @@ Provides statistical checks on a fitted PCA model including:
 - Homoscedasticity tests (Bartlett + Levene) across hours and PCs
 - Vandermonde structural check on the loading matrix
 - Mahalanobis distance per hour in whitened loading space
-- Cross-validation guidance plot (K-fold vs LOOCV bias-variance tradeoff)
-- Comprehensive 6-panel diagnostic figure
+- Comprehensive 5-panel diagnostic figure
 
 Usage
 -----
@@ -273,7 +272,7 @@ def _make_figure(
     ax4.set_xticks(hours)
 
     # ── Panel 5: Z-scores of total contribution ──────────────────────
-    ax5 = fig.add_subplot(gs[1, 1])
+    ax5 = fig.add_subplot(gs[1, 1:])
     bar_colors5 = ["tomato" if abs(z) > 2 else "steelblue" for z in z_scores]
     ax5.bar(hours, z_scores, color=bar_colors5, alpha=0.85)
     ax5.axhline( 2, color="red", linestyle="--", lw=1.2, label="|z|=2")
@@ -285,32 +284,9 @@ def _make_figure(
     ax5.legend(fontsize=8)
     ax5.set_xticks(hours)
 
-    # ── Panel 6: K-fold vs LOOCV bias-variance tradeoff ─────────────
-    ax6 = fig.add_subplot(gs[1, 2])
-    n   = components.shape[0]
-    k_vals     = np.arange(2, n + 1)
-    bias_proxy = 1.0 / k_vals
-    var_proxy  = 1.0 / (n - n / k_vals + 1)
-    cv_error   = (bias_proxy + var_proxy) / (bias_proxy + var_proxy).max()
-    ax6.plot(k_vals, bias_proxy / bias_proxy.max(), "o--", color="tomato",   lw=1.5,
-             label="Bias  (↑ as K↓)")
-    ax6.plot(k_vals, var_proxy  / var_proxy.max(),  "s--", color="steelblue", lw=1.5,
-             label="Variance (↑ as K↑)")
-    ax6.plot(k_vals, cv_error,                      "^-",  color="purple",    lw=2,
-             label="Total CV error")
-    ax6.axvline(5,  color="orange", linestyle=":", lw=1.5, label="K=5")
-    ax6.axvline(10, color="green",  linestyle=":", lw=1.5, label="K=10")
-    ax6.axvline(n,  color="grey",   linestyle=":", lw=1.5, label=f"K={n} (LOOCV)")
-    ax6.set_xlabel("K (number of folds)", fontsize=9)
-    ax6.set_ylabel("Relative magnitude (normalised)", fontsize=9)
-    ax6.set_title(
-        "K-Fold CV Bias-Variance Tradeoff\n(K=5 or K=10 recommended for large n)", fontsize=9)
-    ax6.legend(fontsize=7.5, loc="upper right")
-    ax6.set_xlim(1, n + 1)
-
     plt.suptitle(
         "Extended PCA Fitting Diagnostics: "
-        "Normality · Homoscedasticity · Vandermonde · Mahalanobis · CV",
+        "Normality · Homoscedasticity · Vandermonde · Mahalanobis",
         fontsize=12, fontweight="bold", y=1.01)
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
