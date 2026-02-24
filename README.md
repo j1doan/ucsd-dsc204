@@ -40,23 +40,11 @@ This pipeline processes raw NYC TLC taxi trip data (Parquet format) into an anal
 
 ### Required Packages
 
-```bash
-pip install pandas numpy pyarrow dask[dataframe] fsspec s3fs psutil tqdm scipy matplotlib folium scikit-learn pygam
-```
-
 **Note:** Install all packages together to ensure compatibility. If running on AWS:
 
 ```bash
-pip install --upgrade pandas numpy pyarrow dask[dataframe] fsspec s3fs psutil
+pip install -r requirements.txt
 ```
-
-### Optional: Development & Testing
-
-```bash
-pip install pytest pytest-cov
-```
-
----
 
 ## Quick Start
 
