@@ -2,8 +2,8 @@
 
 A production-grade pipeline for processing NYC TLC taxi trip Parquet data into aggregated time-series tables.
 
-**Assignment:** DSC 291 Homework 1 (100 points)  
-**Status:** Complete with Parts 1–5 implemented and tested
+**Assignments:** DSC 291 Homework 1, 2, and 3  
+**Status:** HW1 complete (Parts 1–5 implemented and tested) · HW2 complete (PCA, tail analysis, Folium map, bootstrap) · HW3 complete (GAM fare prediction notebook)
 
 ---
 
@@ -27,6 +27,8 @@ This pipeline processes raw NYC TLC taxi trip data (Parquet format) into an anal
 - ✅ Adaptive partition optimization (via PyArrow blocksize)
 - ✅ Comprehensive error handling and logging
 - ✅ Full test coverage (58 tests across all modules)
+- ✅ PCA (Dask covariance) + tail analysis + Folium map + bootstrap stability (HW2)
+- ✅ GAM fare prediction with partial dependence, bootstrap CIs, and location enrichment (HW3)
 
 ---
 
@@ -38,23 +40,11 @@ This pipeline processes raw NYC TLC taxi trip data (Parquet format) into an anal
 
 ### Required Packages
 
-```bash
-pip install pandas numpy pyarrow dask[dataframe] fsspec s3fs psutil tqdm scipy matplotlib folium scikit-learn
-```
-
 **Note:** Install all packages together to ensure compatibility. If running on AWS:
 
 ```bash
-pip install --upgrade pandas numpy pyarrow dask[dataframe] fsspec s3fs psutil
+pip install -r requirements.txt
 ```
-
-### Optional: Development & Testing
-
-```bash
-pip install pytest pytest-cov
-```
-
----
 
 ## Quick Start
 
@@ -98,70 +88,6 @@ This will:
 2. Process locally (writes intermediates to `./output/intermediate/`)
 3. Upload final wide table to `s3://dsc291-ucsd//wide-table/`
 4. Optionally keep intermediate files for debugging
-
----
-
-## Homework 2 — PCA, tail analysis & bootstrap (new)
-
-A compact toolkit and CLI to run PCA on the wide table, analyze coefficient tails, produce a Folium map of the first two PCs by pickup zone, and run bootstrap stability checks.
-
-Quick CLI example (reads the public wide table; writes results locally and optionally uploads to S3):
-
-```bash
-python -m pivot_and_bootstrap.hw2_run \
-  --input s3://dsc291-pprashant-results/taxi-wide/full \
-  --output-dir ./hw2_output \
-  --s3-output s3://dsc291-ucsd/taxi/hw2_output \
-  --zones-csv ./data/taxi_zones.csv --workers 8 --B 100
-```
-
-Notes:
-- Default input (public read): `s3://dsc291-pprashant-results/taxi-wide/full`.
-- `--anon-s3` uses anonymous S3 access for public buckets (read-only).
-- Outputs are written to `--output-dir` (local path by default: `./hw2_output`).
-
-How to read from the public S3 input and write results to a *new* S3 location
-(you said you only want to read the input and not overwrite it):
-
-1) Recommended (safe — read from public S3, write outputs to a different S3 bucket):
-
-- Run the HW2 CLI reading from the public S3 and saving results locally, then upload the result folder to your S3 bucket:
-
-```bash
-# run (reads public S3)
-python -m pivot_and_bootstrap.hw2_run \
-  --input s3://dsc291-pprashant-results/taxi-wide/full --output-dir ./hw2_output --anon-s3 --B 100
-
-# upload produced outputs to your S3 bucket (requires AWS credentials)
-aws s3 cp ./hw2_output s3://your-bucket/hw2_output --recursive
-```
-
-2) Programmatic alternative — read from public S3 and write a specific output directly to S3 (example: CSV of PC scores):
-
-```python
-import s3fs
-from pivot_and_bootstrap.hw2_run import aggregate_scores_by_pickup_place
-
-# aggregate_scores_by_pickup_place writes a CSV using pandas.to_csv;
-# pandas + s3fs supports writing to 's3://' paths if you have write access.
-aggregate_scores_by_pickup_place(
-    pca_pkl_path='s3://dsc291-pprashant-results/taxi-wide/full/pca_model.pkl',  # or local pkl
-    parquet_path='s3://dsc291-pprashant-results/taxi-wide/full',
-    output_scores_csv='s3://your-bucket/hw2_output/pc_scores_by_pickup_place.csv'
-)
-```
-
-Caveats:
-- Writing directly to an S3 path requires credentials (or the target bucket must allow public writes). Use `s3fs.S3FileSystem(key=..., secret=...)` or set AWS env vars.
-- The HW2 CLI reads the public input by setting `storage_options={'anon': True}` when `--anon-s3` is used; this does not modify or write to the input path.
-
-3) Direct upload of any produced local file (images, JSON, pkl):
-
-```python
-import boto3
-s3 = boto3.client('s3')
-s3.upload_file('./hw2_output/pca_model.pkl', 'your-bucket', 'hw2_output/pca_model.pkl')
-```
 
 ---
 
@@ -518,28 +444,74 @@ If files have different schemas:
 ## File Structure
 
 ```
-DSC 204/
-├── pivot_utils.py                 # Core utilities (Parts 1-2)
-├── partition_optimization.py       # Partition sizing (Part 3)
-├── pivot_all_files.py             # Main pipeline (Part 4)
-├── pivot_and_bootstrap/           # HW2: PCA, Tail, Map, Bootstrap
-├── test_pivot_comprehensive.py    # Test suite (Part 5)
-├── README.md                       # Documentation (Part 6)
-└── performance.md                  # Performance report (generated after running)
+ucsd-dsc204/
+├── pivot_utils.py                 # Core utilities: column detection, pivoting, S3 helpers
+├── partition_optimization.py      # Adaptive Parquet partition sizing
+├── pivot_all_files.py             # Main HW1 pipeline (pandas + multiprocessing)
+├── pivot_all_files_dask.py        # Alternative HW1 pipeline (pure Dask)
+├── pivot_and_bootstrap/           # HW2 package: PCA, tail analysis, Folium map, bootstrap
+│   ├── pca_analysis.py            # Part 1: Dask covariance PCA
+│   ├── tail_analysis.py           # Part 2: Tail classification + power-law fit
+│   ├── mapping.py                 # Part 3: Folium choropleth map
+│   ├── bootstrap_stability.py     # Part 4: Bootstrap eigenvector stability
+│   └── hw2_run.py                 # HW2 CLI entry point
+├── hw3_output/
+│   └── taxi_fare_gam.ipynb        # HW3: GAM fare prediction notebook
+├── hw2_output/                    # HW2 produced outputs (see HW2 section above)
+├── output/                        # HW1 dask pipeline output (final_table.parquet)
+├── data/
+│   └── taxi_zones.csv             # NYC TLC zone → coordinate mapping (used by HW2 map)
+├── sample_data/
+│   └── sample_wide.parquet        # Small sample of wide table for testing
+├── test_pivot_comprehensive.py    # Full test suite (58+ tests)
+├── pa/
+│   ├── hw2.md                     # HW2 specification
+│   └── hw3.md                     # HW3 specification
+├── README.md                      # This file
+└── performance.md                 # HW1 performance report
 ```
 
 ---
 
 ## HW2: PCA, Tail Analysis, Folium Map, & Bootstrap Stability
 
-A companion package lives under `pivot_and_bootstrap/` and implements the four parts of HW2:
+A companion package lives under `pivot_and_bootstrap/` and implements the four parts of HW2.
+All outputs are written to `hw2_output/`.
 
-- Part 1: PCA on the unnormalized wide table (`pca_analysis.fit_pca_dask`) — saves `pca_model.pkl` and `variance_explained.png`.
-- Part 2: Tail analysis on eigenvector coefficients (`tail_analysis.analyze_coefficients`) — saves `coefficient_distribution.png` and `tail_analysis_report.json`.
-- Part 3: Folium map of aggregated PC1/PC2 scores by `pickup_place` (`mapping.create_pc1_pc2_map`) — saves `pc1_pc2_folium_map.html`.
-- Part 4: Bootstrap stability of eigenvectors (`bootstrap_stability.bootstrap_pca_stability`) — saves `bootstrap_stability_report.json` and stability plots.
+### Parts
 
-Quick run (requires `folium`, `scipy`, and standard packages listed above):
+| Part | Module | Description | Output |
+|------|--------|-------------|--------|
+| 1 | `pca_analysis` | PCA on unnormalized wide table; Dask covariance; missing values filled with column mean | `pca_model.pkl`, `variance_explained.png` |
+| 2 | `tail_analysis` | Distribution of eigenvector loadings; light/heavy-tail classification; power-law α fit | `coefficient_distribution.png`, `tail_analysis_report.json` |
+| 3 | `mapping` | Aggregate PC1/PC2 scores by pickup zone; interactive Folium choropleth | `pc1_pc2_folium_map.html`, `pc_scores_by_pickup_place.csv` |
+| 4 | `bootstrap_stability` | Resample rows B=100 times; subspace affinity, Procrustes distance, component correlations | `bootstrap_stability_report.json`, `bootstrap_pc1_band.png`, `eigenvector_corr_boxplot.png` |
+
+Diagnostics (condition number, Shapiro-Wilk, homoscedasticity, etc.) are written to `hw2_output/diagnostics/`.
+
+### Key Results
+
+**PCA (Part 1)**
+- PC1 explains **84.1 %** of variance; PC1 + PC2 explain **91.9 %** combined.
+- Effective rank ≈ 1.40 (2 PCs pass the Kaiser criterion out of 24).
+- Eigenvectors are perfectly orthogonal (max off-diagonal < 2.5 × 10⁻¹⁵).
+
+**Tail Analysis (Part 2)**
+- Classification: **light-tailed** (Gaussian-like, not power-law).
+- Best-fit power-law exponent α ≈ **5.93** (steep falloff), R² ≈ 0.982 on top 5 % of loadings.
+
+**Bootstrap Stability (Part 4, B = 100)**
+
+| Metric | Mean | Std |
+|--------|------|-----|
+| Subspace affinity | 0.99997 | 5.4 × 10⁻⁵ |
+| Procrustes distance | 0.00657 | 0.00443 |
+| PC1 correlation | 0.99999 | 2.0 × 10⁻⁵ |
+| PC2 correlation | 0.99997 | 5.5 × 10⁻⁵ |
+
+Eigenvectors are highly stable across bootstrap resamples.
+
+### Quick Run
 
 ```bash
 python -m pivot_and_bootstrap.hw2_run \
@@ -548,9 +520,104 @@ python -m pivot_and_bootstrap.hw2_run \
 ```
 
 Notes:
-- If your S3 bucket is public, pass `--anon-s3` to use anonymous access.
-- Provide `--zones-csv` (with `pickup_place,latitude,longitude`) to enable the Folium map.
-- The default input path is `s3://dsc291-pprashant-results/taxi-wide/full` as requested.
+- Pass `--anon-s3` for anonymous access to public S3 buckets.
+- Provide `--zones-csv` (columns: `pickup_place`, `latitude`, `longitude`) to enable the Folium map.
+- Default input: `s3://dsc291-pprashant-results/taxi-wide/full`.
+
+### HW2 Output Structure
+
+```
+hw2_output/
+├── pca_model.pkl                    # Saved PCA model (eigenvectors + variances)
+├── variance_explained.png           # Scree / cumulative variance plot
+├── coefficient_distribution.png     # Eigenvector loading histogram + Q-Q + log-log survival
+├── tail_analysis_report.json        # classification, alpha, R², tail_fraction
+├── pc_scores_by_pickup_place.csv    # Aggregated PC1–PC24 scores per zone (used by HW3)
+├── pc1_pc2_folium_map.html          # Interactive Folium choropleth (PC1 color, PC2 size)
+├── bootstrap_pc1_band.png           # Bootstrap PC1 band plot
+├── eigenvector_corr_boxplot.png     # Per-component correlation boxplot across B resamples
+├── bootstrap_stability_report.json  # Subspace affinity, Procrustes, component correlations
+└── diagnostics/
+    ├── diagnostics_report.json      # Condition number, Shapiro-Wilk, homoscedasticity, etc.
+    └── extended_diagnostics.png     # Diagnostic figures
+```
+
+---
+
+## HW3: Taxi Fare Prediction with a GAM
+
+**Notebook:** `hw3_output/taxi_fare_gam.ipynb`
+
+Predicts NYC yellow-taxi `fare_amount` from *non-fare* trip features using a Gaussian Generalized
+Additive Model (`pygam.LinearGAM`) with identity link. The notebook runs top-to-bottom without
+errors and produces all required figures.
+
+### Sections
+
+| # | Section | Description |
+|---|---------|-------------|
+| 1 | Title & Intro | Goal statement: predict fare from trip features via GAM |
+| 2 | Imports & Compat shim | SciPy `csr_matrix.A` compatibility fix for pygam + all imports |
+| 3 | Configuration | Configurable `DATA_PATH`, `MAX_ROWS`, `RANDOM_SEED`, `TRAIN_FRAC`, extra-credit toggles |
+| 4 | Load & Prepare | Anonymous S3 Parquet read; schema normalization (handles both TLC column-name variants via regex); sample `MAX_ROWS` rows |
+| 5 | Feature Engineering | Derive `trip_duration_min`, `hour_of_day`, `day_of_week`; clean invalid rows; cap at 99th percentile |
+| 6 | Location PCA (EC) | Join HW2 `pc_scores_by_pickup_place.csv` on `pickup_location` → adds `pc1_score`, `pc2_score` as smooth terms |
+| 7 | Train/Val Split | 80 % train / 20 % validation; reports sizes |
+| 8 | GAM Fit | `LinearGAM(s(0)+s(1)+s(2)+s(3)+l(4)[+s(5)+s(6)])` with λ grid search; prints `gam.summary()` |
+| 9 | Evaluate | Validation RMSE, MAE, R²; actual-vs-predicted scatter plot with y = x reference line |
+| 10 | Partial Dependence | Term-effect plots with 95 % CI bands for all predictors (distance, duration, hour, weekday, passenger count, PC1/PC2) |
+| 11 | Bootstrap CIs (EC) | 50 bootstrap resamples → compare bootstrap 95 % percentile bands vs. pygam analytic CIs for top 3 terms |
+| 12 | Fare Breakdown (EC) | Mean `|partial effect|` per term plotted as a horizontal bar chart |
+| 13 | Discussion | Limitations: no surcharges/tolls, no GPS coordinates, single-month data, noisy passenger count |
+
+### Data
+
+- **Default source:** `s3://dsc291-ucsd/taxi/Dataset/2021/yellow_taxi/yellow_tripdata_2021-01.parquet` (anonymous S3 read)
+- **Predictors:** `trip_distance`, `trip_duration_min`, `hour_of_day`, `day_of_week`, `passenger_count` (+ `pc1_score`, `pc2_score` if location PCA enabled)
+- **Excluded (forbidden fare-related columns):** `total_amount`, `tip_amount`, `extra`, `mta_tax`, `tolls_amount`, surcharges, airport fees
+
+### Extra Credit Included
+
+1. **Location PCA enrichment** — HW2 `pc_scores_by_pickup_place.csv` joined on `PULocationID`; PC1 and PC2 added as smooth GAM terms, absorbing spatial demand structure.
+2. **Bootstrap CI comparison** — For `trip_distance`, `trip_duration_min`, and `hour_of_day`, bootstrap 95 % percentile CIs (B = 50) are overlaid against pygam's analytic CIs to assess whether the model-derived uncertainty is realistic.
+3. **Fare component breakdown** — Mean absolute partial effect per term visualized as a sorted horizontal bar chart, showing which features drive the most fare variation.
+
+### GAM Model Terms
+
+| Index | Feature | Term type | Notes |
+|-------|---------|-----------|-------|
+| 0 | `trip_distance` | `s()` smooth | Primary fare driver |
+| 1 | `trip_duration_min` | `s()` smooth | Correlated with distance |
+| 2 | `hour_of_day` | `s()` smooth, 24 knots | Captures rush-hour surge |
+| 3 | `day_of_week` | `s()` smooth, 7 knots | Weekend vs weekday patterns |
+| 4 | `passenger_count` | `l()` linear | Discrete; linear sufficient |
+| 5 | `pc1_score` | `s()` smooth | Zone demand intensity (EC) |
+| 6 | `pc2_score` | `s()` smooth | Zone demand contrast (EC) |
+
+### Quick Run
+
+```bash
+# Install extra dependency (not in HW1/HW2 requirements)
+pip install pygam
+
+# Execute notebook
+cd hw3_output
+jupyter nbconvert --to notebook --execute --inplace taxi_fare_gam.ipynb \
+    --ExecutePreprocessor.timeout=600
+```
+
+Or open `hw3_output/taxi_fare_gam.ipynb` in VS Code / JupyterLab and run all cells.
+
+### HW3 Output Structure
+
+```
+hw3_output/
+├── taxi_fare_gam.ipynb              # Main deliverable notebook
+├── actual_vs_predicted.png          # Scatter plot: actual vs predicted fare
+├── partial_dependence.png           # Term-effect plots with 95 % CI bands
+├── bootstrap_ci_comparison.png      # Bootstrap vs. pygam CI comparison (EC)
+└── fare_component_breakdown.png     # Per-term fare contribution bar chart (EC)
+```
 
 ---
 
@@ -562,6 +629,9 @@ Notes:
 - **fsspec:** https://filesystem-spec.readthedocs.io/
 - **S3fs:** https://s3fs.readthedocs.io/
 - **PyArrow:** https://arrow.apache.org/docs/python/
+- **pygam:** https://pygam.readthedocs.io/
+- **scikit-learn:** https://scikit-learn.org/
+- **Folium:** https://python-visualization.github.io/folium/
 
 ---
 
@@ -569,4 +639,4 @@ Notes:
 
 **Course:** DSC 291: Big Data Analytics (WI26)
 **Instructor:** UC San Diego
-**Assignment:** Homework 1 – Taxi Data Pivoting  
+**Assignments:** Homework 1 (Taxi Data Pivoting), Homework 2 (PCA + Tail + Map + Bootstrap), Homework 3 (GAM Fare Prediction)  

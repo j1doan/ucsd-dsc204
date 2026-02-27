@@ -1,0 +1,15 @@
+pandas
+numpy
+pyarrow
+dask[dataframe]
+fsspec
+s3fs
+psutil
+tqdm
+scipy
+matplotlib
+folium
+scikit-learn
+pygam
+pytest
+pytest-cov
