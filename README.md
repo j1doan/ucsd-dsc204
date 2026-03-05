@@ -446,33 +446,74 @@ If files have different schemas:
 
 ```
 ucsd-dsc204/
-├── pivot_utils.py                 # Core utilities: column detection, pivoting, S3 helpers
-├── partition_optimization.py      # Adaptive Parquet partition sizing
-├── pivot_all_files.py             # Main HW1 pipeline (pandas + multiprocessing)
-├── pivot_all_files_dask.py        # Alternative HW1 pipeline (pure Dask)
-├── pivot_and_bootstrap/           # HW2 package: PCA, tail analysis, Folium map, bootstrap
-│   ├── pca_analysis.py            # Part 1: Dask covariance PCA
-│   ├── tail_analysis.py           # Part 2: Tail classification + power-law fit
-│   ├── mapping.py                 # Part 3: Folium choropleth map
-│   ├── bootstrap_stability.py     # Part 4: Bootstrap eigenvector stability
-│   └── hw2_run.py                 # HW2 CLI entry point
-├── hw3_output/
-│   └── taxi_fare_gam.ipynb        # HW3: GAM fare prediction notebook
-├── hw4_output/
-│   └── xgboost_taxi.ipynb         # HW4: XGBoost yellow/green classification notebook
-├── hw2_output/                    # HW2 produced outputs (see HW2 section above)
-├── output/                        # HW1 dask pipeline output (final_table.parquet)
-├── data/
-│   └── taxi_zones.csv             # NYC TLC zone → coordinate mapping (used by HW2 map)
-├── sample_data/
-│   └── sample_wide.parquet        # Small sample of wide table for testing
-├── test_pivot_comprehensive.py    # Full test suite (58+ tests)
-├── pa/
-│   ├── hw2.md                     # HW2 specification
-│   ├── hw3.md                     # HW3 specification
-│   └── hw4.md                     # HW4 specification
 ├── README.md                      # This file
-└── performance.md                 # HW1 performance report
+├── requirements.txt               # Python package dependencies
+├── hw1_output/                    # HW1: Taxi pivoting pipeline
+│   ├── final_table.parquet        # Final combined wide table
+│   ├── homework_taxi_data_pivoting.md  # HW1 write-up
+│   ├── performance.md             # HW1 performance report
+│   ├── performance1.md            # Supplemental performance notes
+│   ├── report_summary.md          # Pipeline run report summary
+│   ├── intermediate/              # Per-month intermediate Parquet files
+│   │   └── 2023/
+│   │       ├── 01/data.parquet
+│   │       ├── 02/data.parquet
+│   │       └── 03/data.parquet
+│   └── scripts/
+│       ├── pivot_utils.py         # Core utilities: column detection, pivoting, S3 helpers
+│       ├── partition_optimization.py  # Adaptive Parquet partition sizing
+│       ├── pivot_all_files.py     # Main HW1 pipeline (pandas + multiprocessing)
+│       ├── pivot_all_files_dask.py    # Alternative HW1 pipeline (pure Dask)
+│       ├── summarize_report.py    # Report summarization helper
+│       ├── test_pivot_comprehensive.py    # Full test suite (58+ tests)
+│       ├── test_pivot_date_location_hour.py  # Additional pivot tests
+│       └── test_pivot_utils_s3.py # S3 utility tests
+├── hw2_output/                    # HW2: PCA, tail analysis, Folium map, bootstrap
+│   ├── pca_model.pkl              # Saved PCA model (eigenvectors + variances)
+│   ├── variance_explained.png     # Scree / cumulative variance plot
+│   ├── coefficient_distribution.png  # Eigenvector loading histogram + Q-Q + log-log survival
+│   ├── tail_analysis_report.json  # Classification, alpha, R², tail_fraction
+│   ├── pc_scores_by_pickup_place.csv  # Aggregated PC1–PC24 scores per zone (used by HW3)
+│   ├── pc1_pc2_folium_map.html    # Interactive Folium choropleth (PC1 color, PC2 size)
+│   ├── bootstrap_pc1_band.png     # Bootstrap PC1 band plot
+│   ├── eigenvector_corr_boxplot.png  # Per-component correlation boxplot across B resamples
+│   ├── bootstrap_stability_report.json  # Subspace affinity, Procrustes, component correlations
+│   ├── output_2022/report.json    # Pipeline run report (2022 data)
+│   ├── output_full/report.json    # Pipeline run report (full dataset)
+│   ├── diagnostics/
+│   │   ├── diagnostics_report.json    # Condition number, Shapiro-Wilk, homoscedasticity, etc.
+│   │   └── extended_diagnostics.png   # Diagnostic figures
+│   └── scripts/
+│       ├── __init__.py
+│       ├── pca_analysis.py        # Part 1: Dask covariance PCA
+│       ├── tail_analysis.py       # Part 2: Tail classification + power-law fit
+│       ├── mapping.py             # Part 3: Folium choropleth map
+│       ├── bootstrap_stability.py # Part 4: Bootstrap eigenvector stability
+│       ├── diagnostics.py         # PCA diagnostics helpers
+│       ├── hw2_run.py             # HW2 CLI entry point
+│       └── test_hw2.py            # HW2 test suite
+├── hw3_output/                    # HW3: GAM fare prediction
+│   ├── taxi_fare_gam.ipynb        # Main deliverable notebook
+│   ├── actual_vs_predicted.png    # Scatter plot: actual vs predicted fare
+│   ├── partial_dependence.png     # Term-effect plots with 95 % CI bands
+│   ├── bootstrap_ci_comparison.png    # Bootstrap vs. pygam CI comparison (EC)
+│   ├── fare_component_breakdown.png   # Per-term fare contribution bar chart (EC)
+│   ├── extra_correlation_heatmap.png
+│   ├── extra_distance_vs_fare_by_service.png
+│   ├── extra_fare_by_dow.png
+│   ├── extra_fare_by_hour_violin.png
+│   ├── extra_fare_by_region.png
+│   ├── extra_fare_by_service.png
+│   ├── extra_fare_distribution.png
+│   ├── extra_gam_by_region.png
+│   └── extra_gam_distance_by_service.png
+└── hw4_output/                    # HW4: XGBoost taxi classification
+    ├── xgboost_taxi.ipynb         # Main deliverable notebook
+    ├── part_a_interpretation.png  # Confusion matrix, feature importance, feature value range
+    ├── part_b_interpretation.png  # Confusion matrix + PC feature importance
+    ├── ec1_enhanced_partb.png     # EC-1: confusion matrix + feature importance (PC + date + location)
+    ├── ec2_bootstrap.png          # EC-2: bootstrap accuracy distributions for all three models
+    └── ec3_hyperparams.png        # EC-3: hyperparameter sensitivity heatmap + line plot
 ```
 
 ---
