@@ -2,8 +2,8 @@
 
 A production-grade pipeline for processing NYC TLC taxi trip Parquet data into aggregated time-series tables.
 
-**Assignments:** DSC 291 Homework 1, 2, and 3  
-**Status:** HW1 complete (Parts 1–5 implemented and tested) · HW2 complete (PCA, tail analysis, Folium map, bootstrap) · HW3 complete (GAM fare prediction notebook)
+**Assignments:** DSC 291 Homework 1, 2, 3, and 4  
+**Status:** HW1 complete (Parts 1–5 implemented and tested) · HW2 complete (PCA, tail analysis, Folium map, bootstrap) · HW3 complete (GAM fare prediction notebook) · HW4 complete (XGBoost yellow/green taxi classification)
 
 ---
 
@@ -29,6 +29,7 @@ This pipeline processes raw NYC TLC taxi trip data (Parquet format) into an anal
 - ✅ Full test coverage (58 tests across all modules)
 - ✅ PCA (Dask covariance) + tail analysis + Folium map + bootstrap stability (HW2)
 - ✅ GAM fare prediction with partial dependence, bootstrap CIs, and location enrichment (HW3)
+- ✅ XGBoost taxi classification (raw trips + pivoted PCA profiles) with bootstrap & hyperparameter sensitivity (HW4)
 
 ---
 
@@ -457,6 +458,8 @@ ucsd-dsc204/
 │   └── hw2_run.py                 # HW2 CLI entry point
 ├── hw3_output/
 │   └── taxi_fare_gam.ipynb        # HW3: GAM fare prediction notebook
+├── hw4_output/
+│   └── xgboost_taxi.ipynb         # HW4: XGBoost yellow/green classification notebook
 ├── hw2_output/                    # HW2 produced outputs (see HW2 section above)
 ├── output/                        # HW1 dask pipeline output (final_table.parquet)
 ├── data/
@@ -466,7 +469,8 @@ ucsd-dsc204/
 ├── test_pivot_comprehensive.py    # Full test suite (58+ tests)
 ├── pa/
 │   ├── hw2.md                     # HW2 specification
-│   └── hw3.md                     # HW3 specification
+│   ├── hw3.md                     # HW3 specification
+│   └── hw4.md                     # HW4 specification
 ├── README.md                      # This file
 └── performance.md                 # HW1 performance report
 ```
@@ -621,6 +625,61 @@ hw3_output/
 
 ---
 
+## HW4: XGBoost Taxi Classification
+
+**Notebook:** `hw4_output/xgboost_taxi.ipynb`
+
+Classifies NYC taxi trips as *yellow* vs *green* in two settings using **Dask** for data loading
+and **XGBClassifier** for the models.
+
+### Parts
+
+| # | Section | Description |
+|---|---------|-------------|
+| A | Raw Trip Classification | Load trip-level Parquet with Dask; engineer features (duration, hour, day-of-week); stratified 80/20 train/val split; XGBClassifier with `multi:softmax` |
+| B | Pivoted-Profile Classification | Build hourly trip-count pivot table (date × taxi_type × pickup_place × hour); convert to row proportions; reduce to PC1–PC5 via PCA; XGBClassifier on PC features |
+
+### Features
+
+| Part | Features | Classes |
+|------|----------|---------|
+| A | `trip_distance`, `trip_duration_min`, `hour`, `day_of_week`, `passenger_count` | 0 = yellow, 1 = green |
+| B | PC1–PC5 of 24-h hourly proportion profile | yellow / green |
+
+### Extra Credit Included
+
+1. **EC-1** – Enhanced Part B: augments PC1–PC5 with date-derived features (`year`, `month`, `day_of_week`) and pickup-location signals (`pickup_loc_id`, coarse `region`). Feature importance exposes which signals improve on PCA alone.
+2. **EC-2** – Bootstrap stability (N = 100): resample validation sets to estimate mean accuracy, std dev, and 95 % percentile CIs for all three models (Part A, Part B, EC-1).
+3. **EC-3** – Hyperparameter sensitivity sweep on Part A: grid over `max_depth` ∈ {2, 4, 6, 8} × `learning_rate` ∈ {0.01, 0.05, 0.10, 0.30}, rendered as an accuracy heatmap and per-depth line plot.
+
+### Quick Run
+
+```bash
+# Install extra dependency (if not already present)
+pip install xgboost
+
+# Execute notebook
+cd hw4_output
+jupyter nbconvert --to notebook --execute --inplace xgboost_taxi.ipynb \
+    --ExecutePreprocessor.timeout=600
+```
+
+Or open `hw4_output/xgboost_taxi.ipynb` in VS Code / JupyterLab and run all cells.
+
+### HW4 Output Structure
+
+```
+hw4_output/
+├── xgboost_taxi.ipynb               # Main deliverable notebook
+├── part_a_interpretation.png        # Confusion matrix, feature importance, feature value range
+├── part_b_interpretation.png        # Confusion matrix + PC feature importance
+├── ec1_enhanced_partb.png           # EC-1: confusion matrix + feature importance (PC + date + location)
+├── ec2_bootstrap.png                # EC-2: bootstrap accuracy distributions for all three models
+└── ec3_hyperparams.png              # EC-3: hyperparameter sensitivity heatmap + line plot
+```
+
+---
+
 ## References
 
 - **NYC TLC Data:** https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page
@@ -632,6 +691,7 @@ hw3_output/
 - **pygam:** https://pygam.readthedocs.io/
 - **scikit-learn:** https://scikit-learn.org/
 - **Folium:** https://python-visualization.github.io/folium/
+- **XGBoost:** https://xgboost.readthedocs.io/
 
 ---
 
@@ -639,4 +699,4 @@ hw3_output/
 
 **Course:** DSC 291: Big Data Analytics (WI26)
 **Instructor:** UC San Diego
-**Assignments:** Homework 1 (Taxi Data Pivoting), Homework 2 (PCA + Tail + Map + Bootstrap), Homework 3 (GAM Fare Prediction)  
+**Assignments:** Homework 1 (Taxi Data Pivoting), Homework 2 (PCA + Tail + Map + Bootstrap), Homework 3 (GAM Fare Prediction), Homework 4 (XGBoost Taxi Classification)
